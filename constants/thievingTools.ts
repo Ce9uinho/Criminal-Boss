@@ -1,0 +1,101 @@
+import { ThievingTool } from '@/types/game';
+
+export const THIEVING_TOOLS: ThievingTool[] = [
+  {
+    id: 'basic_lockpick',
+    name: 'Basic Lockpick',
+    tier: 1,
+    icon: '🗄️',
+    bonuses: {
+      failureReductionMultiplier: 0.98,
+      cooldownReductionMultiplier: 0.95,
+      extraLootChance: 0.05,
+      heatReductionMultiplier: 1.0,
+      cooldownTimeReduction: 0.05,
+    },
+    requirements: [
+      { resourceId: 'cash', quantity: 500 },
+      { resourceId: 'cheap_watch', quantity: 25 },
+      { resourceId: 'premium_wine', quantity: 10 },
+    ],
+  },
+  {
+    id: 'precision_lockpick',
+    name: 'Precision Lockpick',
+    tier: 2,
+    icon: '🔑',
+    bonuses: {
+      failureReductionMultiplier: 0.96,
+      cooldownReductionMultiplier: 0.90,
+      extraLootChance: 0.10,
+      heatReductionMultiplier: 1.0,
+      cooldownTimeReduction: 0.10,
+    },
+    requirements: [
+      { resourceId: 'cash', quantity: 2500 },
+      { resourceId: 'guns', quantity: 20 },
+      { resourceId: 'drug_supplies', quantity: 30 },
+      { resourceId: 'vehicle_electronics', quantity: 15 },
+    ],
+  },
+  {
+    id: 'electronic_pick',
+    name: 'Electronic Pick',
+    tier: 3,
+    icon: '⚡',
+    bonuses: {
+      failureReductionMultiplier: 0.94,
+      cooldownReductionMultiplier: 0.85,
+      extraLootChance: 0.15,
+      heatReductionMultiplier: 1.0,
+      cooldownTimeReduction: 0.15,
+    },
+    requirements: [
+      { resourceId: 'cash', quantity: 10000 },
+      { resourceId: 'smartphones', quantity: 60 },
+      { resourceId: 'gaming_consoles', quantity: 40 },
+      { resourceId: 'diamond_rings', quantity: 40 },
+    ],
+  },
+  {
+    id: 'bypass_kit',
+    name: 'Security Bypass Kit',
+    tier: 4,
+    icon: '🧰',
+    bonuses: {
+      failureReductionMultiplier: 0.92,
+      cooldownReductionMultiplier: 0.80,
+      extraLootChance: 0.20,
+      heatReductionMultiplier: 1.0,
+      cooldownTimeReduction: 0.20,
+    },
+    requirements: [
+      { resourceId: 'cash', quantity: 50000 },
+      { resourceId: 'designer_bags', quantity: 60 },
+      { resourceId: 'transport_bonds', quantity: 40 },
+      { resourceId: 'museum_pieces', quantity: 20 },
+      { resourceId: 'satellite_equipment', quantity: 20 },
+    ],
+  },
+  {
+    id: 'master_thief_kit',
+    name: 'Master Thief Kit',
+    tier: 5,
+    icon: '👑',
+    bonuses: {
+      failureReductionMultiplier: 0.90,
+      cooldownReductionMultiplier: 0.75,
+      extraLootChance: 0.25,
+      heatReductionMultiplier: 1.0,
+      cooldownTimeReduction: 0.25,
+    },
+    requirements: [
+      { resourceId: 'cash', quantity: 200000 },
+      { resourceId: 'gold_bullion', quantity: 40 },
+      { resourceId: 'diamond_rings', quantity: 40 },
+      { resourceId: 'classified_intel', quantity: 30 },
+      { resourceId: 'satellite_equipment', quantity: 30 },
+      { resourceId: 'quantum_processors', quantity: 10 },
+    ],
+  },
+];
