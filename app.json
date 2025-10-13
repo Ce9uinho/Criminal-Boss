@@ -8,6 +8,7 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "platforms": ["ios", "android", "web"],
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -25,6 +26,7 @@
       "package": "app.rork.melvor-idle-clone-rt0ovz6x"
     },
     "web": {
+      "bundler": "metro",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
