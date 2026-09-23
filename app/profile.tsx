@@ -2,12 +2,16 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useGameStore } from '@/store/gameStore';
+import { useAchievementTotals } from '@/hooks/useAchievementSnapshot';
+import { formatCash } from '@/constants/numberFormat';
 import { SKILL_ICONS, getXpForLevel, RESOURCES } from '@/constants/gameData';
 import { User, Crown, Trophy, Clock, Coins, TrendingUp, Star, Award, Target, Calendar, Skull, Cigarette, Bomb, Car, DollarSign, Save, Briefcase, Bike, Syringe } from 'lucide-react-native';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { skills, bank, mastery, gold, playerName, playerIcon, setPlayerName, setPlayerIcon } = useGameStore();
+  const { skills, bank, mastery, gold, playerName, playerIcon, setPlayerName, setPlayerIcon, lifetimeStats } = useGameStore();
+  const achievementTotals = useAchievementTotals();
+  const totalProduced = Object.values(lifetimeStats?.produced ?? {}).reduce((sum, n) => sum + n, 0);
   const [editOpen, setEditOpen] = useState<boolean>(false);
   const [draftName, setDraftName] = useState<string>(playerName ?? '');
   const ICONS = useMemo(() => ['Skull','Cigarette','Bomb','Car','DollarSign','Safe','Briefcase','Knife','Syringe','Crown'] as const, []);
@@ -68,37 +72,12 @@ export default function ProfileScreen() {
     return Object.values(mastery).reduce((total, m) => total + m.level, 0);
   };
 
-  const getPlayTime = () => {
-    // Mock play time - in a real game this would be tracked
-    const hours = Math.floor(getTotalXp() / 10000);
-    const minutes = Math.floor((getTotalXp() % 10000) / 100);
-    return `${hours}h ${minutes}m`;
-  };
-
-  const getAchievementCount = () => {
-    // Mock achievements based on progress
-    let count = 0;
-    const playerLevel = getPlayerLevel();
-    const totalXp = getTotalXp();
-    const bankValue = getTotalBankValue();
-    
-    if (playerLevel >= 10) count++;
-    if (playerLevel >= 25) count++;
-    if (playerLevel >= 50) count++;
-    if (totalXp >= 100000) count++;
-    if (gold >= 50000) count++;
-    if (bankValue >= 100000) count++;
-    if (Object.keys(bank).length >= 20) count++;
-    
-    return count;
-  };
-
   const StatCard = ({ 
     icon, 
     title, 
     value, 
     subtitle,
-    color = '#4ade80' 
+    color = '#E0B252' 
   }: { 
     icon: React.ReactNode; 
     title: string; 
@@ -158,44 +137,44 @@ export default function ProfileScreen() {
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <TouchableOpacity style={styles.avatarContainer} onPress={onOpenEdit} accessibilityRole="button" testID="editProfileButton">
-            {renderIcon(playerIcon ?? 'Skull', 48, '#4ade80')}
+            {renderIcon(playerIcon ?? 'Skull', 48, '#E0B252')}
           </TouchableOpacity>
           <View style={styles.profileInfo}>
             <Text style={styles.playerName}>{playerName ?? 'Player'}</Text>
             <Text style={styles.playerTitle}>Level {Math.floor(playerLevel)} Criminal</Text>
             <View style={styles.xpContainer}>
               <Text style={styles.xpText}>{totalXp.toLocaleString()} Total XP</Text>
-              <Crown size={16} color="#ffd700" />
+              <Crown size={16} color="#E0B252" />
             </View>
           </View>
         </View>
 
         {/* Quick Stats */}
-        <SectionHeader title="OVERVIEW" icon={<TrendingUp size={20} color="#4ade80" />} />
+        <SectionHeader title="OVERVIEW" icon={<TrendingUp size={20} color="#E0B252" />} />
         
         <View style={styles.statsGrid}>
           <StatCard
-            icon={<Coins size={20} color="#ffd700" />}
+            icon={<Coins size={20} color="#E0B252" />}
             title="Net Worth"
             value={`$${(gold + getTotalBankValue()).toLocaleString()}`}
             subtitle="Gold + Bank Value"
-            color="#ffd700"
+            color="#E0B252"
           />
           
           <StatCard
             icon={<Clock size={20} color="#8b5cf6" />}
-            title="Play Time"
-            value={getPlayTime()}
-            subtitle="Estimated"
+            title="Goods Moved"
+            value={formatCash(totalProduced)}
+            subtitle="Crafted + stolen"
             color="#8b5cf6"
           />
           
           <StatCard
-            icon={<Trophy size={20} color="#f59e0b" />}
+            icon={<Trophy size={20} color="#E0B252" />}
             title="Achievements"
-            value={`${getAchievementCount()}/20`}
+            value={`${achievementTotals.completed}/${achievementTotals.total}`}
             subtitle="Unlocked"
-            color="#f59e0b"
+            color="#E0B252"
           />
           
           <StatCard
@@ -208,7 +187,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Detailed Stats */}
-        <SectionHeader title="STATISTICS" icon={<Target size={20} color="#4ade80" />} />
+        <SectionHeader title="STATISTICS" icon={<Target size={20} color="#E0B252" />} />
         
         <View style={styles.detailedStats}>
           <View style={styles.statRow}>
@@ -244,7 +223,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Skills Progress */}
-        <SectionHeader title="SKILL PROGRESS" icon={<Award size={20} color="#4ade80" />} />
+        <SectionHeader title="SKILL PROGRESS" icon={<Award size={20} color="#E0B252" />} />
         
         <View style={styles.skillsContainer}>
           {Object.entries(skills)
@@ -255,12 +234,12 @@ export default function ProfileScreen() {
         </View>
 
         {/* Recent Achievements */}
-        <SectionHeader title="RECENT MILESTONES" icon={<Calendar size={20} color="#4ade80" />} />
+        <SectionHeader title="RECENT MILESTONES" icon={<Calendar size={20} color="#E0B252" />} />
         
         <View style={styles.achievementsContainer}>
           {playerLevel >= 50 && (
             <TouchableOpacity style={styles.achievementItem}>
-              <Crown size={24} color="#ffd700" />
+              <Crown size={24} color="#E0B252" />
               <View style={styles.achievementContent}>
                 <Text style={styles.achievementTitle}>High Roller</Text>
                 <Text style={styles.achievementDesc}>Reached level 50</Text>
@@ -270,7 +249,7 @@ export default function ProfileScreen() {
           
           {gold >= 50000 && (
             <TouchableOpacity style={styles.achievementItem}>
-              <Coins size={24} color="#ffd700" />
+              <Coins size={24} color="#E0B252" />
               <View style={styles.achievementContent}>
                 <Text style={styles.achievementTitle}>Money Bags</Text>
                 <Text style={styles.achievementDesc}>Accumulated $50,000</Text>
@@ -280,7 +259,7 @@ export default function ProfileScreen() {
           
           {Object.keys(bank).length >= 20 && (
             <TouchableOpacity style={styles.achievementItem}>
-              <Trophy size={24} color="#f59e0b" />
+              <Trophy size={24} color="#E0B252" />
               <View style={styles.achievementContent}>
                 <Text style={styles.achievementTitle}>Collector</Text>
                 <Text style={styles.achievementDesc}>Own 20+ different items</Text>
@@ -314,7 +293,7 @@ export default function ProfileScreen() {
                 value={draftName}
                 onChangeText={setDraftName}
                 placeholder="Enter name"
-                placeholderTextColor="#666"
+                placeholderTextColor="#6F685F"
                 style={styles.input}
                 maxLength={20}
                 returnKeyType="done"
@@ -330,7 +309,7 @@ export default function ProfileScreen() {
                       onPress={() => setPlayerIcon(name)}
                       testID={`icon_${name}`}
                     >
-                      {renderIcon(name, 28, selected ? '#0f172a' : '#4ade80')}
+                      {renderIcon(name, 28, selected ? '#121016' : '#E0B252')}
                       <Text style={styles.iconLabel}>{name}</Text>
                     </TouchableOpacity>
                   );
@@ -341,7 +320,7 @@ export default function ProfileScreen() {
                   <Text style={styles.actionText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={onSave} style={[styles.actionBtn, styles.saveBtn]} testID="saveEditBtn">
-                  <Text style={[styles.actionText, { color: '#0f172a' }]}>Save</Text>
+                  <Text style={[styles.actionText, { color: '#121016' }]}>Save</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -355,7 +334,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0f',
+    backgroundColor: '#0B0A0D',
   },
   scrollView: {
     flex: 1,
@@ -363,23 +342,23 @@ const styles = StyleSheet.create({
   profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     margin: 16,
     padding: 20,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#4ade80',
+    borderColor: '#E0B252',
   },
   avatarContainer: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(74, 222, 128, 0.2)',
+    backgroundColor: 'rgba(224, 178, 82, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
     borderWidth: 2,
-    borderColor: '#4ade80',
+    borderColor: '#E0B252',
   },
   profileInfo: {
     flex: 1,
@@ -392,7 +371,7 @@ const styles = StyleSheet.create({
   },
   playerTitle: {
     fontSize: 16,
-    color: '#4ade80',
+    color: '#E0B252',
     marginBottom: 8,
   },
   xpContainer: {
@@ -402,7 +381,7 @@ const styles = StyleSheet.create({
   },
   xpText: {
     fontSize: 14,
-    color: '#888',
+    color: '#8F877E',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -417,7 +396,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#4ade80',
+    color: '#E0B252',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -430,11 +409,11 @@ const styles = StyleSheet.create({
     minWidth: '45%',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
   },
   statIcon: {
     width: 40,
@@ -449,25 +428,25 @@ const styles = StyleSheet.create({
   },
   statTitle: {
     fontSize: 12,
-    color: '#888',
+    color: '#8F877E',
     marginBottom: 2,
   },
   statValue: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#4ade80',
+    color: '#E0B252',
   },
   statSubtitle: {
     fontSize: 10,
-    color: '#666',
+    color: '#6F685F',
     marginTop: 2,
   },
   detailedStats: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     marginHorizontal: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
     padding: 16,
   },
   statRow: {
@@ -476,21 +455,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#2a2a3e',
+    borderBottomColor: '#2C2733',
   },
   statLabel: {
     fontSize: 14,
-    color: '#888',
+    color: '#8F877E',
   },
   skillsContainer: {
     marginHorizontal: 16,
   },
   skillProgress: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
     marginBottom: 8,
   },
   skillHeader: {
@@ -512,21 +491,21 @@ const styles = StyleSheet.create({
   },
   skillLevel: {
     fontSize: 12,
-    color: '#4ade80',
+    color: '#E0B252',
   },
   skillXp: {
     fontSize: 12,
-    color: '#888',
+    color: '#8F877E',
   },
   progressBar: {
     height: 6,
-    backgroundColor: '#2a2a3e',
+    backgroundColor: '#2C2733',
     borderRadius: 3,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#4ade80',
+    backgroundColor: '#E0B252',
     borderRadius: 3,
   },
   achievementsContainer: {
@@ -535,11 +514,11 @@ const styles = StyleSheet.create({
   achievementItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
     marginBottom: 8,
   },
   achievementContent: {
@@ -554,7 +533,7 @@ const styles = StyleSheet.create({
   },
   achievementDesc: {
     fontSize: 13,
-    color: '#888',
+    color: '#8F877E',
   },
   footer: {
     alignItems: 'center',
@@ -563,7 +542,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 16,
-    color: '#4ade80',
+    color: '#E0B252',
     fontStyle: 'italic',
   },
   modalBackdrop: {
@@ -575,12 +554,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalCard: {
-    backgroundColor: '#111827',
+    backgroundColor: '#16131A',
     padding: 16,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderWidth: 1,
-    borderColor: '#26304a',
+    borderColor: '#2C2733',
   },
   modalTitle: {
     color: '#fff',
@@ -589,14 +568,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   inputLabel: {
-    color: '#9ca3af',
+    color: '#A8A097',
     fontSize: 12,
     marginBottom: 6,
   },
   input: {
-    backgroundColor: '#0b1220',
+    backgroundColor: '#0E0C11',
     borderWidth: 1,
-    borderColor: '#26304a',
+    borderColor: '#2C2733',
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 10,
@@ -610,20 +589,20 @@ const styles = StyleSheet.create({
   },
   iconCell: {
     width: '30%',
-    backgroundColor: '#0b1220',
+    backgroundColor: '#0E0C11',
     borderWidth: 1,
-    borderColor: '#26304a',
+    borderColor: '#2C2733',
     paddingVertical: 10,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconCellSelected: {
-    borderColor: '#22c55e',
-    backgroundColor: '#22c55e33',
+    borderColor: '#3DD68C',
+    backgroundColor: '#3DD68C33',
   },
   iconLabel: {
-    color: '#9ca3af',
+    color: '#A8A097',
     fontSize: 11,
     marginTop: 6,
   },
@@ -640,14 +619,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   cancelBtn: {
-    borderColor: '#374151',
+    borderColor: '#3E3648',
   },
   saveBtn: {
-    borderColor: '#22c55e',
-    backgroundColor: '#22c55e',
+    borderColor: '#3DD68C',
+    backgroundColor: '#3DD68C',
   },
   actionText: {
-    color: '#e5e7eb',
+    color: '#E8E1D6',
     fontWeight: '600',
   },
 });

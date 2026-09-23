@@ -1,324 +1,250 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Share, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Trash2, Download, Upload, Swords, Save } from 'lucide-react-native';
 import { useGameStore } from '@/store/gameStore';
-import { Volume2, VolumeX, Smartphone, Trash2, Download, Upload, Bell, BellOff, Swords } from 'lucide-react-native';
-
-type Theme = 'dark' | 'light';
-type NotificationSetting = 'all' | 'important' | 'none';
-
-interface GameSettings {
-  soundEnabled: boolean;
-  musicEnabled: boolean;
-  notificationsEnabled: boolean;
-  notificationLevel: NotificationSetting;
-  theme: Theme;
-  autoSave: boolean;
-  compactMode: boolean;
-}
-
-const DEFAULT_SETTINGS: GameSettings = {
-  soundEnabled: true,
-  musicEnabled: true,
-  notificationsEnabled: true,
-  notificationLevel: 'all',
-  theme: 'dark',
-  autoSave: true,
-  compactMode: false,
-};
+import { theme } from '@/constants/theme';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { skills, bank, mastery, gold, maxAllSkills } = useGameStore();
-  const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
-  const [isExporting, setIsExporting] = useState(false);
-  const [isImporting] = useState(false);
+  const exportSave = useGameStore(s => s.exportSave);
+  const importSave = useGameStore(s => s.importSave);
+  const resetGame = useGameStore(s => s.resetGame);
+  const saveGame = useGameStore(s => s.saveGame);
+  const maxAllSkills = useGameStore(s => s.maxAllSkills);
+  const lastSaved = useGameStore(s => s.lastSaved);
 
-  const updateSetting = <K extends keyof GameSettings>(key: K, value: GameSettings[K]) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
-    // In a real app, save settings to storage here
-    console.log('Setting updated:', key, value);
-  };
+  const [exported, setExported] = useState<string | null>(null);
+  const [importText, setImportText] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
 
-  const exportSave = async () => {
+  const onExport = async () => {
+    const data = exportSave();
+    setExported(data);
+    if (Platform.OS === 'web') {
+      try {
+        await (navigator as any)?.clipboard?.writeText(data);
+        useGameStore.getState().pushNotice({ kind: 'success', title: 'Save copied', message: 'Paste it somewhere safe.' });
+      } catch {
+        // Clipboard blocked: the text box below still lets the player copy it manually.
+      }
+      return;
+    }
     try {
-      setIsExporting(true);
-      const gameData = {
-        skills,
-        bank,
-        mastery,
-        gold,
-        lastSaved: Date.now(),
-        exportedAt: new Date().toISOString(),
-        version: '1.0.0'
-      };
-      
-      const saveString = JSON.stringify(gameData, null, 2);
-      console.log('Save data exported:', saveString.length, 'characters');
-      
-      console.log('Export completed - Size:', (saveString.length / 1024).toFixed(1), 'KB');
-    } catch {
-      console.error('Export failed');
-    } finally {
-      setIsExporting(false);
+      await Share.share({ message: data, title: 'Criminal Boss save' });
+    } catch (e) {
+      console.log('Share failed', e);
     }
   };
 
-  const resetGame = () => {
-    console.log('Reset game requested - would show confirmation modal in real app');
+  const onImport = async () => {
+    setImportError(null);
+    const ok = await importSave(importText);
+    if (ok) {
+      setImportText('');
+      setImportOpen(false);
+    } else {
+      setImportError("That doesn't look like a valid Criminal Boss save.");
+    }
   };
 
-  const SettingRow = ({ 
-    icon, 
-    title, 
-    subtitle, 
-    children 
-  }: { 
-    icon: React.ReactNode; 
-    title: string; 
-    subtitle?: string; 
-    children: React.ReactNode; 
-  }) => (
-    <View style={styles.settingRow}>
-      <View style={styles.settingIcon}>
-        {icon}
-      </View>
-      <View style={styles.settingContent}>
-        <Text style={styles.settingTitle}>{title}</Text>
-        {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
-      </View>
-      <View style={styles.settingControl}>
-        {children}
-      </View>
-    </View>
-  );
-
-  const SectionHeader = ({ title }: { title: string }) => (
-    <Text style={styles.sectionHeader}>{title}</Text>
-  );
+  const onReset = async () => {
+    if (!confirmReset) {
+      setConfirmReset(true);
+      setTimeout(() => setConfirmReset(false), 4000);
+      return;
+    }
+    setConfirmReset(false);
+    await resetGame();
+  };
 
   return (
-    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <SectionHeader title="AUDIO" />
-        
-        <SettingRow
-          icon={settings.soundEnabled ? <Volume2 size={20} color="#4ade80" /> : <VolumeX size={20} color="#666" />}
-          title="Sound Effects"
-          subtitle="Play sound effects for actions"
-        >
-          <Switch
-            value={settings.soundEnabled}
-            onValueChange={(value) => updateSetting('soundEnabled', value)}
-            trackColor={{ false: '#2a2a3e', true: '#4ade80' }}
-            thumbColor={settings.soundEnabled ? '#fff' : '#666'}
-          />
-        </SettingRow>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
+      <Text style={styles.sectionHeader}>SAVE DATA</Text>
+      <View style={styles.card}>
+        <Text style={styles.cardText}>Progress saves automatically every 30 seconds and whenever you leave the game.</Text>
+        <Text style={styles.cardMeta}>Last saved {new Date(lastSaved).toLocaleTimeString()}</Text>
+        <TouchableOpacity style={styles.button} onPress={() => saveGame()} testID="btn-save-now">
+          <Save size={18} color={theme.colors.gold} />
+          <Text style={styles.buttonText}>Save now</Text>
+        </TouchableOpacity>
+      </View>
 
-        <SettingRow
-          icon={settings.musicEnabled ? <Volume2 size={20} color="#4ade80" /> : <VolumeX size={20} color="#666" />}
-          title="Background Music"
-          subtitle="Play ambient background music"
-        >
-          <Switch
-            value={settings.musicEnabled}
-            onValueChange={(value) => updateSetting('musicEnabled', value)}
-            trackColor={{ false: '#2a2a3e', true: '#4ade80' }}
-            thumbColor={settings.musicEnabled ? '#fff' : '#666'}
+      <Text style={styles.sectionHeader}>BACKUP</Text>
+      <View style={styles.card}>
+        <TouchableOpacity style={styles.button} onPress={onExport} testID="btn-export-save">
+          <Upload size={18} color={theme.colors.gold} />
+          <Text style={styles.buttonText}>Export save</Text>
+        </TouchableOpacity>
+        {exported && (
+          <TextInput
+            style={styles.codeBox}
+            value={exported}
+            editable={false}
+            multiline
+            selectTextOnFocus
+            testID="export-text"
           />
-        </SettingRow>
+        )}
 
-        <SectionHeader title="NOTIFICATIONS" />
-        
-        <SettingRow
-          icon={settings.notificationsEnabled ? <Bell size={20} color="#4ade80" /> : <BellOff size={20} color="#666" />}
-          title="Push Notifications"
-          subtitle="Receive notifications when offline"
-        >
-          <Switch
-            value={settings.notificationsEnabled}
-            onValueChange={(value) => updateSetting('notificationsEnabled', value)}
-            trackColor={{ false: '#2a2a3e', true: '#4ade80' }}
-            thumbColor={settings.notificationsEnabled ? '#fff' : '#666'}
-          />
-        </SettingRow>
+        <TouchableOpacity style={styles.button} onPress={() => setImportOpen(v => !v)} testID="btn-import-save">
+          <Download size={18} color={theme.colors.gold} />
+          <Text style={styles.buttonText}>Import save</Text>
+        </TouchableOpacity>
+        {importOpen && (
+          <View>
+            <TextInput
+              style={styles.codeBox}
+              value={importText}
+              onChangeText={setImportText}
+              placeholder="Paste an exported save here"
+              placeholderTextColor={theme.colors.textDim}
+              multiline
+              autoCapitalize="none"
+              autoCorrect={false}
+              testID="import-text"
+            />
+            {!!importError && <Text style={styles.error}>{importError}</Text>}
+            <TouchableOpacity
+              style={[styles.primary, !importText.trim() && styles.primaryDisabled]}
+              onPress={onImport}
+              disabled={!importText.trim()}
+              testID="btn-import-confirm"
+            >
+              <Text style={styles.primaryText}>Load this save</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
 
-        <SectionHeader title="GAMEPLAY" />
-        
-        <SettingRow
-          icon={<Download size={20} color="#4ade80" />}
-          title="Auto Save"
-          subtitle="Automatically save progress every 30 seconds"
-        >
-          <Switch
-            value={settings.autoSave}
-            onValueChange={(value) => updateSetting('autoSave', value)}
-            trackColor={{ false: '#2a2a3e', true: '#4ade80' }}
-            thumbColor={settings.autoSave ? '#fff' : '#666'}
-          />
-        </SettingRow>
-
-        <SettingRow
-          icon={<Smartphone size={20} color="#4ade80" />}
-          title="Compact Mode"
-          subtitle="Reduce UI elements for smaller screens"
-        >
-          <Switch
-            value={settings.compactMode}
-            onValueChange={(value) => updateSetting('compactMode', value)}
-            trackColor={{ false: '#2a2a3e', true: '#4ade80' }}
-            thumbColor={settings.compactMode ? '#fff' : '#666'}
-          />
-        </SettingRow>
-
-        <SectionHeader title="DATA MANAGEMENT" />
-        
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={exportSave}
-          disabled={isExporting}
-          testID="btn-export-save"
-        >
-          <Upload size={20} color="#4ade80" />
-          <Text style={styles.actionButtonText}>
-            {isExporting ? 'Exporting...' : 'Export Save Data'}
+      <Text style={styles.sectionHeader}>DANGER ZONE</Text>
+      <View style={[styles.card, styles.dangerCard]}>
+        <Text style={styles.cardText}>Resetting wipes all skills, cash, items and upgrades. This cannot be undone.</Text>
+        <TouchableOpacity style={[styles.button, styles.dangerButton]} onPress={onReset} testID="btn-reset">
+          <Trash2 size={18} color={theme.colors.crimson} />
+          <Text style={[styles.buttonText, { color: theme.colors.crimson }]}>
+            {confirmReset ? 'Tap again to confirm reset' : 'Reset game data'}
           </Text>
         </TouchableOpacity>
+      </View>
 
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.successButton]}
-          onPress={() => {
-            console.log('Max all skills requested');
-            try { maxAllSkills(); } catch (e) { console.log('maxAllSkills failed', e); }
-          }}
-          testID="btn-max-all-skills"
-        >
-          <Swords size={20} color="#22c55e" />
-          <Text style={[styles.actionButtonText, styles.successText]}>
-            Max All Skills (Test)
-          </Text>
-        </TouchableOpacity>
+      {__DEV__ && (
+        <>
+          <Text style={styles.sectionHeader}>DEVELOPER</Text>
+          <View style={styles.card}>
+            <TouchableOpacity style={styles.button} onPress={() => maxAllSkills()} testID="btn-max-all-skills">
+              <Swords size={18} color={theme.colors.emerald} />
+              <Text style={[styles.buttonText, { color: theme.colors.emerald }]}>Max all skills (test)</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
 
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => console.log('Import save requested')}
-          disabled={isImporting}
-        >
-          <Download size={20} color="#4ade80" />
-          <Text style={styles.actionButtonText}>
-            {isImporting ? 'Importing...' : 'Import Save Data'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.dangerButton]}
-          onPress={resetGame}
-        >
-          <Trash2 size={20} color="#ef4444" />
-          <Text style={[styles.actionButtonText, styles.dangerText]}>
-            Reset Game Data
-          </Text>
-        </TouchableOpacity>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Drug Empire v1.0.0</Text>
-          <Text style={styles.footerSubtext}>Settings are saved automatically</Text>
-        </View>
-      </ScrollView>
-    </View>
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>Criminal Boss v1.1.0</Text>
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0f',
+    backgroundColor: theme.colors.bg,
   },
-  scrollView: {
-    flex: 1,
+  content: {
+    padding: 16,
   },
   sectionHeader: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#4ade80',
-    marginTop: 24,
-    marginBottom: 12,
-    marginHorizontal: 20,
+    color: theme.colors.gold,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 2,
+    marginTop: 12,
+    marginBottom: 8,
+    marginLeft: 4,
   },
-  settingRow: {
+  card: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: 14,
+    gap: 10,
+  },
+  dangerCard: {
+    borderColor: theme.colors.crimsonBorder,
+  },
+  cardText: {
+    color: theme.colors.textMuted,
+    fontSize: 13.5,
+    lineHeight: 19,
+  },
+  cardMeta: {
+    color: theme.colors.textDim,
+    fontSize: 12,
+  },
+  button: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a2e',
-    marginHorizontal: 16,
-    marginBottom: 8,
-    padding: 16,
-    borderRadius: 12,
+    gap: 10,
+    backgroundColor: theme.colors.surfaceAlt,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
-  },
-  settingIcon: {
-    marginRight: 16,
-  },
-  settingContent: {
-    flex: 1,
-  },
-  settingTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-    marginBottom: 2,
-  },
-  settingSubtitle: {
-    fontSize: 13,
-    color: '#888',
-  },
-  settingControl: {
-    marginLeft: 12,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1a1a2e',
-    marginHorizontal: 16,
-    marginBottom: 8,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   dangerButton: {
-    borderColor: '#ef4444',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    backgroundColor: theme.colors.crimsonSoft,
+    borderColor: theme.colors.crimsonBorder,
   },
-  successButton: {
-    borderColor: '#22c55e',
-    backgroundColor: 'rgba(34, 197, 94, 0.1)'
+  buttonText: {
+    color: theme.colors.text,
+    fontSize: 15,
+    fontWeight: '700',
   },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4ade80',
-    marginLeft: 12,
+  codeBox: {
+    minHeight: 90,
+    maxHeight: 160,
+    backgroundColor: theme.colors.bgElevated,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    color: theme.colors.textMuted,
+    fontSize: 11,
+    padding: 10,
+    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
+    textAlignVertical: 'top',
   },
-  dangerText: {
-    color: '#ef4444',
+  error: {
+    color: theme.colors.crimson,
+    fontSize: 12.5,
+    marginTop: 6,
   },
-  successText: {
-    color: '#22c55e',
+  primary: {
+    marginTop: 10,
+    backgroundColor: theme.colors.gold,
+    borderRadius: theme.radius.md,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  primaryDisabled: {
+    opacity: 0.4,
+  },
+  primaryText: {
+    color: '#1A1408',
+    fontWeight: '900',
+    fontSize: 15,
   },
   footer: {
     alignItems: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 20,
+    marginTop: 28,
   },
   footerText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#4ade80',
-    marginBottom: 4,
-  },
-  footerSubtext: {
+    color: theme.colors.textDim,
     fontSize: 12,
-    color: '#666',
   },
 });

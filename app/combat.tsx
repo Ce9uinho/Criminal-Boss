@@ -5,13 +5,14 @@ import { Sword, Shield, Map as MapIcon, Coins, Gift } from 'lucide-react-native'
 import { useGameStore } from '@/store/gameStore';
 import { EQUIPMENT_CATALOG } from '@/constants/gameData';
 import type { EquipmentSlot as SlotType } from '@/types/game';
+import { COMBAT_DUNGEONS, getDungeonGoldReward, getPlayerCombatStats, getPlayerAttackIntervalMs, CombatEnemy, CombatDungeon } from '@/constants/combat';
 
 type CombatTab = 'equipment' | 'combat' | 'dungeons';
 
 type Rarity = 'common' | 'elite' | 'boss';
 
-interface SimpleEnemy { id: string; name: string; icon: string; level: number; hp: number; attack: number; defense: number; attackSpeed: number; accuracy: number; evasion: number; critChance: number; critDamage: number; rarity?: Rarity }
-interface SimpleDungeon { id: string; name: string; recommendedLevel: number; enemyCount: number; enemy: SimpleEnemy; boss: SimpleEnemy; description: string }
+type SimpleEnemy = CombatEnemy;
+type SimpleDungeon = CombatDungeon;
 interface SessionLootEntry { type: 'gold' | 'item'; resourceId?: string; quantity: number; at: number }
 
 export default function CombatScreen() {
@@ -47,49 +48,8 @@ export default function CombatScreen() {
     { id: 'gloves', name: 'Gloves', icon: '🧤' },
   ];
 
-  const baseStats = { hp: 100, attack: 10, defense: 5, accuracy: 80, evasion: 10, critChance: 5 } as const;
-  const totalStats = useMemo(() => {
-    const bonus = Object.entries(storeEquipped || {}).reduce<{ hp?: number; attack?: number; defense?: number; accuracy?: number; evasion?: number; critChance?: number }>((acc, [_slot, rid]) => {
-      if (!rid) return acc;
-      const item = (EQUIPMENT_CATALOG as any)[rid];
-      if (!item?.stats) return acc;
-      Object.entries(item.stats).forEach(([k, v]) => {
-        const key = k as keyof typeof acc;
-        const prev = acc[key] ?? 0;
-        acc[key] = prev + ((v as number) ?? 0);
-      });
-      return acc;
-    }, {});
-    return {
-      hp: baseStats.hp + (bonus.hp ?? 0),
-      attack: baseStats.attack + (bonus.attack ?? 0),
-      defense: baseStats.defense + (bonus.defense ?? 0),
-      accuracy: baseStats.accuracy + (bonus.accuracy ?? 0),
-      evasion: baseStats.evasion + (bonus.evasion ?? 0),
-      critChance: baseStats.critChance + (bonus.critChance ?? 0),
-    };
-  }, [storeEquipped, baseStats.hp, baseStats.attack, baseStats.defense, baseStats.accuracy, baseStats.evasion, baseStats.critChance]);
-
-  const dungeons: SimpleDungeon[] = useMemo(() => [
-    {
-      id: 'back_alley',
-      name: 'Back Alley',
-      recommendedLevel: 1,
-      description: 'Shady alleys patrolled by rookie guards.',
-      enemyCount: 4,
-      enemy: { id: 'thug', name: 'Street Thug', icon: '🥊', level: 1, hp: 30, attack: 6, defense: 2, attackSpeed: 1.6, accuracy: 70, evasion: 5, critChance: 5, critDamage: 150, rarity: 'common' },
-      boss: { id: 'alley_boss', name: 'Alley Boss', icon: '🗡️', level: 5, hp: 100, attack: 14, defense: 8, attackSpeed: 1.4, accuracy: 75, evasion: 10, critChance: 10, critDamage: 175, rarity: 'boss' },
-    },
-    {
-      id: 'warehouse',
-      name: 'Abandoned Warehouse',
-      recommendedLevel: 10,
-      description: 'A stash point crawling with vigilantes.',
-      enemyCount: 4,
-      enemy: { id: 'vigilante', name: 'Vigilante', icon: '🕶️', level: 10, hp: 90, attack: 14, defense: 8, attackSpeed: 1.5, accuracy: 75, evasion: 8, critChance: 8, critDamage: 160, rarity: 'common' },
-      boss: { id: 'sheriff', name: 'Sheriff', icon: '⭐', level: 14, hp: 150, attack: 26, defense: 14, attackSpeed: 1.2, accuracy: 80, evasion: 12, critChance: 15, critDamage: 200, rarity: 'boss' },
-    },
-  ], []);
+  const totalStats = useMemo(() => getPlayerCombatStats(storeEquipped), [storeEquipped]);
+  const dungeons: SimpleDungeon[] = COMBAT_DUNGEONS;
   const combatSelectedDungeon = useGameStore(s => s.combatSelectedDungeon);
   const setCombatSelectedDungeon = useGameStore(s => s.setCombatSelectedDungeon);
   const [selectedDungeon, setSelectedDungeon] = useState<string>(combatSelectedDungeon ?? (dungeons[0]?.id ?? 'back_alley'));
@@ -110,13 +70,7 @@ export default function CombatScreen() {
   const fightTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const attackProgress = useRef(new Animated.Value(0)).current;
   const tickMs = 120;
-  const playerIntervalMs = useMemo(() => {
-    const weaponId = (storeEquipped || {}).weapon;
-    const weapon = weaponId ? (EQUIPMENT_CATALOG as any)[weaponId] : undefined;
-    const secPerAttack = typeof weapon?.attackSpeed === 'number' && weapon?.attackSpeed > 0 ? weapon.attackSpeed : 1.6;
-    const intervalMs = Math.floor(secPerAttack * 1000);
-    return Math.max(600, intervalMs);
-  }, [storeEquipped]);
+  const playerIntervalMs = useMemo(() => getPlayerAttackIntervalMs(storeEquipped), [storeEquipped]);
   const enemyIntervalMs = useMemo(() => {
     const secPerAttack = (currentEnemy?.attackSpeed ?? 1.8);
     const intervalMs = Math.floor(secPerAttack * 1000);
@@ -192,6 +146,8 @@ export default function CombatScreen() {
           useGameStore.getState().stopActivity(skillId);
         }
       });
+      // Also cancel a thieving target queued to restart after its cooldown.
+      useGameStore.setState({ thievingAutoResume: false, currentThievingActivity: undefined });
     } catch (e) {
       console.log('Failed to stop other skills', e);
     }
@@ -258,7 +214,7 @@ export default function CombatScreen() {
             const nextLocal = enemyIdxLocal + 1;
             const totalEnemies = (currentDungeon?.enemyCount ?? 0) + 1;
             if (nextLocal >= totalEnemies) {
-              const goldReward = 50 + Math.floor((currentDungeon?.recommendedLevel ?? 1) * 2);
+              const goldReward = currentDungeon ? getDungeonGoldReward(currentDungeon) : 50;
               addGold(goldReward);
               setSessionGold(prev => prev + goldReward);
               addResource('loot_bag', 1);
@@ -459,7 +415,7 @@ export default function CombatScreen() {
           style={[styles.tab, activeTab === 'equipment' && styles.tabActive]}
           onPress={() => setActiveTab('equipment')}
         >
-          <Shield size={20} color={activeTab === 'equipment' ? '#60a5fa' : '#9ca3af'} />
+          <Shield size={20} color={activeTab === 'equipment' ? '#E0B252' : '#A8A097'} />
           <Text style={[styles.tabText, activeTab === 'equipment' && styles.tabTextActive]}>
             Equipment
           </Text>
@@ -469,7 +425,7 @@ export default function CombatScreen() {
           style={[styles.tab, activeTab === 'combat' && styles.tabActive]}
           onPress={() => setActiveTab('combat')}
         >
-          <Sword size={20} color={activeTab === 'combat' ? '#60a5fa' : '#9ca3af'} />
+          <Sword size={20} color={activeTab === 'combat' ? '#E0B252' : '#A8A097'} />
           <Text style={[styles.tabText, activeTab === 'combat' && styles.tabTextActive]}>
             Combat
           </Text>
@@ -479,7 +435,7 @@ export default function CombatScreen() {
           style={[styles.tab, activeTab === 'dungeons' && styles.tabActive]}
           onPress={() => setActiveTab('dungeons')}
         >
-          <MapIcon size={20} color={activeTab === 'dungeons' ? '#60a5fa' : '#9ca3af'} />
+          <MapIcon size={20} color={activeTab === 'dungeons' ? '#E0B252' : '#A8A097'} />
           <Text style={[styles.tabText, activeTab === 'dungeons' && styles.tabTextActive]}>
             Dungeons
           </Text>
@@ -540,15 +496,14 @@ export default function CombatScreen() {
 }
 
 function EquipmentTab({ slots, stats, storeEquipped, equipFromBank, unequip }: { slots: { id: SlotType; name: string; icon: string }[]; stats: { hp: number; attack: number; defense: number; accuracy: number; evasion: number; critChance: number }; storeEquipped: Partial<Record<SlotType, string>>; equipFromBank: (resourceId: string) => void; unequip: (slot: SlotType) => void }) {
-  const layout = [
-    ['helmet'],
-    ['amulet'],
+  // 3-column "paper doll": body slots down the middle, hands and accessories either side.
+  const layout: (SlotType | null)[][] = [
+    ['amulet', 'helmet', 'backpack'],
     ['weapon', 'chest', 'offhand'],
-    ['legs'],
-    ['gloves', 'boots'],
-    ['ring'],
-    ['ammunition', 'backpack', 'scroll', 'potion'],
-  ] as const;
+    ['gloves', 'legs', 'ring'],
+    ['potion', 'boots', 'scroll'],
+    [null, 'ammunition', null],
+  ];
   const slotById = Object.fromEntries(slots.map(s => [s.id, s] as const)) as Record<SlotType, { id: SlotType; name: string; icon: string }>;
   const [inspectSlot, setInspectSlot] = useState<SlotType | null>(null);
   const inspectedRid = inspectSlot ? (storeEquipped[inspectSlot] ?? null) : null;
@@ -560,8 +515,9 @@ function EquipmentTab({ slots, stats, storeEquipped, equipFromBank, unequip }: {
         <View style={styles.silhouetteBody}>
           {layout.map((row, idx) => (
             <View key={`row-${idx}`} style={styles.silhouetteRow}>
-              {row.map((sid) => {
-                const slot = slotById[sid as SlotType];
+              {row.map((sid, cellIdx) => {
+                if (!sid) return <View key={`empty-${idx}-${cellIdx}`} style={styles.slotSpacer} />;
+                const slot = slotById[sid];
                 const rid = storeEquipped[slot.id];
                 const eq = rid ? (EQUIPMENT_CATALOG as any)[rid] : null;
                 return (
@@ -583,35 +539,35 @@ function EquipmentTab({ slots, stats, storeEquipped, equipFromBank, unequip }: {
 
       <Modal transparent visible={inspectSlot !== null} onRequestClose={() => setInspectSlot(null)}>
         <TouchableOpacity activeOpacity={1} onPress={() => setInspectSlot(null)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()} style={{ backgroundColor: '#0b1220', borderRadius: 12, borderWidth: 1, borderColor: '#1f2937', padding: 16, width: '90%', maxWidth: 360 }}>
+          <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()} style={{ backgroundColor: '#0E0C11', borderRadius: 12, borderWidth: 1, borderColor: '#2C2733', padding: 16, width: '90%', maxWidth: 360 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>{inspectedItem?.name ?? (inspectSlot ? slotById[inspectSlot]?.name : 'Empty slot')}</Text>
               <TouchableOpacity onPress={() => setInspectSlot(null)} testID="equip-inspect-close"><Text style={{ color: '#fff', fontSize: 20 }}>✕</Text></TouchableOpacity>
             </View>
             {inspectedItem ? (
               <View>
-                <Text style={{ color: '#d1d5db', fontSize: 13, lineHeight: 18, fontStyle: 'italic' as const, marginBottom: 12 }}>{inspectedItem.description ?? 'No description'}</Text>
+                <Text style={{ color: '#D4CCC1', fontSize: 13, lineHeight: 18, fontStyle: 'italic' as const, marginBottom: 12 }}>{inspectedItem.description ?? 'No description'}</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-                  {inspectedItem.stats?.attack != null && (<Text style={{ color: '#9ca3af' }}>ATK +{inspectedItem.stats.attack}</Text>)}
-                  {inspectedItem.stats?.defense != null && (<Text style={{ color: '#9ca3af' }}>DEF +{inspectedItem.stats.defense}</Text>)}
-                  {inspectedItem.stats?.accuracy != null && (<Text style={{ color: '#9ca3af' }}>ACC +{inspectedItem.stats.accuracy}</Text>)}
-                  {inspectedItem.stats?.evasion != null && (<Text style={{ color: '#9ca3af' }}>EVA +{inspectedItem.stats.evasion}</Text>)}
-                  {inspectedItem.stats?.critChance != null && (<Text style={{ color: '#9ca3af' }}>CRIT +{inspectedItem.stats.critChance}%</Text>)}
-                  {inspectedItem.attackSpeed != null && (<Text style={{ color: '#9ca3af' }}>APS {inspectedItem.attackSpeed}</Text>)}
+                  {inspectedItem.stats?.attack != null && (<Text style={{ color: '#A8A097' }}>ATK +{inspectedItem.stats.attack}</Text>)}
+                  {inspectedItem.stats?.defense != null && (<Text style={{ color: '#A8A097' }}>DEF +{inspectedItem.stats.defense}</Text>)}
+                  {inspectedItem.stats?.accuracy != null && (<Text style={{ color: '#A8A097' }}>ACC +{inspectedItem.stats.accuracy}</Text>)}
+                  {inspectedItem.stats?.evasion != null && (<Text style={{ color: '#A8A097' }}>EVA +{inspectedItem.stats.evasion}</Text>)}
+                  {inspectedItem.stats?.critChance != null && (<Text style={{ color: '#A8A097' }}>CRIT +{inspectedItem.stats.critChance}%</Text>)}
+                  {inspectedItem.attackSpeed != null && (<Text style={{ color: '#A8A097' }}>APS {inspectedItem.attackSpeed}</Text>)}
                 </View>
                 <View style={{ flexDirection: 'row', gap: 12 }}>
-                  <TouchableOpacity style={{ flex: 1, backgroundColor: '#ef4444', paddingVertical: 12, borderRadius: 8, alignItems: 'center' }} onPress={() => { if (inspectSlot) { unequip(inspectSlot); setInspectSlot(null); } }} testID="equip-unequip">
+                  <TouchableOpacity style={{ flex: 1, backgroundColor: '#E5484D', paddingVertical: 12, borderRadius: 8, alignItems: 'center' }} onPress={() => { if (inspectSlot) { unequip(inspectSlot); setInspectSlot(null); } }} testID="equip-unequip">
                     <Text style={{ color: '#fff', fontWeight: '700' }}>Unequip</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={{ flex: 1, backgroundColor: '#374151', paddingVertical: 12, borderRadius: 8, alignItems: 'center' }} onPress={() => setInspectSlot(null)}>
+                  <TouchableOpacity style={{ flex: 1, backgroundColor: '#3E3648', paddingVertical: 12, borderRadius: 8, alignItems: 'center' }} onPress={() => setInspectSlot(null)}>
                     <Text style={{ color: '#fff', fontWeight: '700' }}>Close</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             ) : (
               <View>
-                <Text style={{ color: '#9ca3af', marginBottom: 12 }}>No item equipped in this slot.</Text>
-                <TouchableOpacity style={{ backgroundColor: '#374151', paddingVertical: 12, borderRadius: 8, alignItems: 'center' }} onPress={() => setInspectSlot(null)}>
+                <Text style={{ color: '#A8A097', marginBottom: 12 }}>No item equipped in this slot.</Text>
+                <TouchableOpacity style={{ backgroundColor: '#3E3648', paddingVertical: 12, borderRadius: 8, alignItems: 'center' }} onPress={() => setInspectSlot(null)}>
                   <Text style={{ color: '#fff', fontWeight: '700' }}>Close</Text>
                 </TouchableOpacity>
               </View>
@@ -733,7 +689,7 @@ function CombatTabContent({ stats, playerHp, enemy, enemyHp, isFighting, onStart
       </View>
       <View style={styles.lootTrack} testID="combat-loot-track">
         <View style={styles.lootPill}>
-          <Coins size={14} color="#fbbf24" />
+          <Coins size={14} color="#E0B252" />
           <Text style={styles.lootText}>Gold: {sessionGold}</Text>
         </View>
       </View>
@@ -744,18 +700,18 @@ function CombatTabContent({ stats, playerHp, enemy, enemyHp, isFighting, onStart
         itemEntries.forEach(e => { const k = e.resourceId as string; aggregated[k] = (aggregated[k] ?? 0) + e.quantity; });
         const list = Object.entries(aggregated).slice(-30).reverse();
         return (
-          <View style={{ marginTop: 8, backgroundColor: '#0b1220', borderRadius: 10, borderWidth: 1, borderColor: '#1f2937', padding: 10 }} testID="combat-loot-list">
+          <View style={{ marginTop: 8, backgroundColor: '#0E0C11', borderRadius: 10, borderWidth: 1, borderColor: '#2C2733', padding: 10 }} testID="combat-loot-list">
             <Text style={{ color: '#fff', fontWeight: '700', marginBottom: 6 }}>Recent loot</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
               {list.map(([rid, qty]) => (
-                <View key={`loot-${rid}`} style={{ width: 60, height: 60, backgroundColor: '#111827', borderColor: '#1f2937', borderWidth: 1, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
+                <View key={`loot-${rid}`} style={{ width: 60, height: 60, backgroundColor: '#16131A', borderColor: '#2C2733', borderWidth: 1, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
                   {(() => {
                     const res = (require('@/constants/gameData') as any).RESOURCES?.[rid];
                     const ResourceImage = require('@/components/ResourceImage').ResourceImage;
                     return <ResourceImage resource={res} size={34} />;
                   })()}
-                  <View style={{ position: 'absolute', right: 4, bottom: 4, backgroundColor: '#1f2937', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                    <Text style={{ color: '#e5e7eb', fontSize: 10, fontWeight: '700' }}>x{qty}</Text>
+                  <View style={{ position: 'absolute', right: 4, bottom: 4, backgroundColor: '#2C2733', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                    <Text style={{ color: '#E8E1D6', fontSize: 10, fontWeight: '700' }}>x{qty}</Text>
                   </View>
                 </View>
               ))}
@@ -797,7 +753,7 @@ function DungeonsTab({ dungeons, selectedId, onSelect }: { dungeons: SimpleDunge
             </View>
           </View>
           <View style={styles.lootRow}>
-            <Text style={styles.lootHint}>Rewards: Treasure Bag on completion - Total enemies: {d.enemyCount + 1}</Text>
+            <Text style={styles.lootHint}>Clear reward: ${getDungeonGoldReward(d)} + 💰 Loot Bag · {d.enemyCount + 1} fights</Text>
           </View>
         </TouchableOpacity>
       ))}
@@ -808,13 +764,13 @@ function DungeonsTab({ dungeons, selectedId, onSelect }: { dungeons: SimpleDunge
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0f',
+    backgroundColor: '#0B0A0D',
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#111827',
+    backgroundColor: '#16131A',
     borderBottomWidth: 1,
-    borderBottomColor: '#1f2937',
+    borderBottomColor: '#2C2733',
   },
   tab: {
     flex: 1,
@@ -827,15 +783,15 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: '#60a5fa',
+    borderBottomColor: '#E0B252',
   },
   tabText: {
-    color: '#9ca3af',
+    color: '#A8A097',
     fontSize: 14,
     fontWeight: '600' as const,
   },
   tabTextActive: {
-    color: '#60a5fa',
+    color: '#E0B252',
   },
   content: {
     flex: 1,
@@ -847,67 +803,71 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   silhouetteWrap: {
-    backgroundColor: '#0b1220',
+    backgroundColor: '#0E0C11',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#2C2733',
     padding: 12,
     marginBottom: 16,
   },
   silhouetteBody: {
-    alignItems: 'center',
     gap: 8,
   },
   silhouetteRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'stretch',
     gap: 8,
   },
+  slotSpacer: {
+    flex: 1,
+  },
   slotBadge: {
-    minWidth: 140,
-    flexGrow: 1,
-    maxWidth: '48%',
-    backgroundColor: '#111827',
-    borderRadius: 10,
+    flex: 1,
+    minWidth: 0,
+    minHeight: 76,
+    backgroundColor: '#16131A',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#1f2937',
-    padding: 12,
+    borderColor: '#2C2733',
+    paddingVertical: 10,
+    paddingHorizontal: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
   slotBadgeEmpty: {
-    backgroundColor: '#1a1a24',
-    borderColor: '#374151',
+    backgroundColor: '#18151D',
+    borderColor: '#3E3648',
     borderStyle: 'dashed' as const,
   },
   slotBadgeFilled: {
-    borderColor: '#60a5fa',
+    borderColor: '#E0B252',
   },
-  avatarBubble: { backgroundColor: '#0b1220', padding: 10, borderRadius: 999, borderWidth: 1, borderColor: '#1f2937' },
+  avatarBubble: { backgroundColor: '#0E0C11', padding: 10, borderRadius: 999, borderWidth: 1, borderColor: '#2C2733' },
   equipIcon: {
     fontSize: 20,
     marginBottom: 6,
-    color: '#e5e7eb',
+    color: '#E8E1D6',
   },
   equipIconEmpty: {
-    color: '#4b5563',
+    color: '#5A5249',
     opacity: 0.5,
   },
   equipName: {
-    color: '#e5e7eb',
+    color: '#E8E1D6',
     fontWeight: '700' as const,
+    fontSize: 11.5,
+    textAlign: 'center' as const,
   },
   equipNameEmpty: {
-    color: '#6b7280',
+    color: '#7A7269',
     fontWeight: '500' as const,
     fontSize: 11,
   },
-  enemyMeta: { color: '#9ca3af', fontSize: 12, marginTop: 2 },
-  enemyStatsPanel: { backgroundColor: '#111827', borderRadius: 12, borderWidth: 1, borderColor: '#1f2937', padding: 12, marginTop: 12 },
+  enemyMeta: { color: '#A8A097', fontSize: 12, marginTop: 2 },
+  enemyStatsPanel: { backgroundColor: '#16131A', borderRadius: 12, borderWidth: 1, borderColor: '#2C2733', padding: 12, marginTop: 12 },
   enemyStatsTitle: { color: '#fff', fontSize: 14, fontWeight: '700' as const, marginBottom: 8 },
   enemyStatsRow: { flexDirection: 'row', gap: 12, justifyContent: 'space-around', marginBottom: 4 },
-  enemyStat: { color: '#9ca3af', fontSize: 12, fontWeight: '600' as const },
+  enemyStat: { color: '#A8A097', fontSize: 12, fontWeight: '600' as const },
   sectionTitle: {
     color: '#fff',
     fontSize: 18,
@@ -918,54 +878,54 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#111827',
+    backgroundColor: '#16131A',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#2C2733',
     padding: 16,
     gap: 12,
   },
   playerPanel: { alignItems: 'center', flex: 1 },
   enemyPanel: { alignItems: 'center', flex: 1 },
   vsDivider: { paddingHorizontal: 8 },
-  vsText: { color: '#9ca3af', fontWeight: '800' as const },
+  vsText: { color: '#A8A097', fontWeight: '800' as const },
   entityIcon: { fontSize: 28 },
-  entityName: { color: '#e5e7eb', fontWeight: '700' as const, marginTop: 6 },
-  entityHp: { color: '#9ca3af', marginTop: 2 },
-  hpBar: { height: 8, backgroundColor: '#1f2937', borderRadius: 6, overflow: 'hidden', marginTop: 6, width: '100%' },
-  hpFill: { height: '100%', backgroundColor: '#10b981' },
-  enemyHpFill: { height: '100%', backgroundColor: '#ef4444' },
-  damageText: { position: 'absolute', top: 10, color: '#ef4444', fontWeight: '800' as const },
-  damageTextEnemy: { position: 'absolute', top: 10, right: 10, color: '#60a5fa', fontWeight: '800' as const },
-  missText: { position: 'absolute', top: 10, color: '#fbbf24', fontWeight: '800' as const, fontSize: 14 },
-  missTextEnemy: { position: 'absolute', top: 10, right: 10, color: '#fbbf24', fontWeight: '800' as const, fontSize: 14 },
-  attackTimer: { height: 6, width: 80, backgroundColor: '#1f2937', borderRadius: 4, overflow: 'hidden' },
-  attackFill: { height: '100%', backgroundColor: '#60a5fa' },
-  enemyAttackFill: { height: '100%', backgroundColor: '#f59e0b' },
+  entityName: { color: '#E8E1D6', fontWeight: '700' as const, marginTop: 6 },
+  entityHp: { color: '#A8A097', marginTop: 2 },
+  hpBar: { height: 8, backgroundColor: '#2C2733', borderRadius: 6, overflow: 'hidden', marginTop: 6, width: '100%' },
+  hpFill: { height: '100%', backgroundColor: '#3DD68C' },
+  enemyHpFill: { height: '100%', backgroundColor: '#E5484D' },
+  damageText: { position: 'absolute', top: 10, color: '#E5484D', fontWeight: '800' as const },
+  damageTextEnemy: { position: 'absolute', top: 10, right: 10, color: '#E0B252', fontWeight: '800' as const },
+  missText: { position: 'absolute', top: 10, color: '#E0B252', fontWeight: '800' as const, fontSize: 14 },
+  missTextEnemy: { position: 'absolute', top: 10, right: 10, color: '#E0B252', fontWeight: '800' as const, fontSize: 14 },
+  attackTimer: { height: 6, width: 80, backgroundColor: '#2C2733', borderRadius: 4, overflow: 'hidden' },
+  attackFill: { height: '100%', backgroundColor: '#E0B252' },
+  enemyAttackFill: { height: '100%', backgroundColor: '#E0B252' },
   placeholder: {
-    color: '#9ca3af',
+    color: '#A8A097',
     fontSize: 14,
     textAlign: 'center',
     marginTop: 16,
   },
   combatActions: { flexDirection: 'row', justifyContent: 'center', marginTop: 12, marginBottom: 8 },
-  startBtn: { backgroundColor: '#10b981', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
-  startBtnText: { color: '#0b1220', fontWeight: '800' as const },
-  stopBtn: { backgroundColor: '#ef4444', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
+  startBtn: { backgroundColor: '#3DD68C', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
+  startBtnText: { color: '#0E0C11', fontWeight: '800' as const },
+  stopBtn: { backgroundColor: '#E5484D', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
   stopBtnText: { color: '#fff', fontWeight: '800' as const },
   lootTrack: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10, marginTop: 8 },
-  lootPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#111827', borderColor: '#1f2937', borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
-  lootText: { color: '#e5e7eb', fontSize: 12, fontWeight: '600' as const },
+  lootPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#16131A', borderColor: '#2C2733', borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
+  lootText: { color: '#E8E1D6', fontSize: 12, fontWeight: '600' as const },
   dungeonCard: {
-    backgroundColor: '#111827',
+    backgroundColor: '#16131A',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#2C2733',
     padding: 16,
     marginBottom: 12,
   },
   dungeonCardActive: {
-    borderColor: '#60a5fa',
+    borderColor: '#E0B252',
   },
   dungeonHeader: {
     flexDirection: 'row',
@@ -974,18 +934,18 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   dungeonName: { color: '#fff', fontSize: 16, fontWeight: '700' as const },
-  dungeonMeta: { color: '#9ca3af', fontSize: 12 },
-  dungeonDesc: { color: '#9ca3af', fontSize: 12, marginBottom: 8 },
+  dungeonMeta: { color: '#A8A097', fontSize: 12 },
+  dungeonDesc: { color: '#A8A097', fontSize: 12, marginBottom: 8 },
   enemyRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  enemyPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#0b1220', borderColor: '#1f2937', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 999 },
+  enemyPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#0E0C11', borderColor: '#2C2733', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 999 },
   enemyIcon: { fontSize: 12 },
-  enemyName: { color: '#e5e7eb', fontSize: 12, fontWeight: '600' as const },
+  enemyName: { color: '#E8E1D6', fontSize: 12, fontWeight: '600' as const },
   enemyTag: { fontSize: 10, textTransform: 'uppercase' as const },
-  commonTag: { color: '#9ca3af' },
+  commonTag: { color: '#A8A097' },
   eliteTag: { color: '#a78bfa' },
-  bossTag: { color: '#f87171' },
+  bossTag: { color: '#E5484D' },
   lootRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
-  lootHint: { color: '#9ca3af', fontSize: 12 },
+  lootHint: { color: '#A8A097', fontSize: 12 },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -993,15 +953,15 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   statCard: {
-    backgroundColor: '#111827',
+    backgroundColor: '#16131A',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#2C2733',
     padding: 16,
     width: '48%',
   },
   statLabel: {
-    color: '#9ca3af',
+    color: '#A8A097',
     fontSize: 12,
     marginBottom: 4,
   },

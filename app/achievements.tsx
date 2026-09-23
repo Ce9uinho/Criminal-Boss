@@ -5,6 +5,7 @@ import { useGameStore } from '@/store/gameStore';
 import { ACHIEVEMENTS, ACHIEVEMENT_CATEGORIES, getAchievementDescription } from '@/constants/achievements';
 import { Trophy, Coins, Package, Boxes, TrendingUp, Award, Wrench, GraduationCap, Crown, Factory, Gem, Target, Flag, Wine, Microscope, UserX } from 'lucide-react-native';
 import { AchievementCategory } from '@/types/game';
+import { useAchievementSnapshot } from '@/hooks/useAchievementSnapshot';
 
 const iconMap: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
   Trophy,
@@ -27,40 +28,8 @@ const iconMap: Record<string, React.ComponentType<{ size?: number; color?: strin
 
 export default function AchievementsScreen() {
   const insets = useSafeAreaInsets();
-  const { skills, bank, mastery, gold } = useGameStore();
   const [selectedCategory, setSelectedCategory] = useState<AchievementCategory | null>('smuggling');
-
-  const snapshot = React.useMemo(() => {
-    const skillsArray = Object.values(skills ?? {});
-    const skillLevels: Record<string, number> = Object.fromEntries(Object.entries(skills ?? {}).map(([id, s]) => [id, s.level ?? 1]));
-    const averageSkillLevel = (() => {
-      const count = skillsArray.length;
-      if (count === 0) return 1;
-      const sum = skillsArray.reduce((acc, s) => acc + (s.level || 1), 0);
-      return Math.floor(sum / count);
-    })();
-    const highestSkillLevel = skillsArray.reduce((max, s) => Math.max(max, s.level || 1), 1);
-    const totalItemsInBank = Object.values(bank ?? {}).reduce((sum, it) => sum + (it.quantity || 0), 0);
-    const uniqueItemsInBank = Object.keys(bank ?? {}).length;
-    const masteryLevels = Object.values(mastery ?? {}).map(m => m.level || 1);
-    const masteryMilestones25 = masteryLevels.filter(l => l >= 25).length;
-    const masteryMilestones50 = masteryLevels.filter(l => l >= 50).length;
-    const masteryMilestones75 = masteryLevels.filter(l => l >= 75).length;
-    const masteryMilestones100 = masteryLevels.filter(l => l >= 100).length;
-    return {
-      gold: gold ?? 0,
-      totalItemsInBank,
-      uniqueItemsInBank,
-      averageSkillLevel,
-      highestSkillLevel,
-      masteryMilestones25,
-      masteryMilestones50,
-      masteryMilestones75,
-      masteryMilestones100,
-      skillLevels,
-      perSkill: {},
-    };
-  }, [skills, bank, mastery, gold]);
+  const snapshot = useAchievementSnapshot();
 
   const achievementsByCategory = useMemo(() => {
     const grouped: Record<AchievementCategory, typeof ACHIEVEMENTS> = {
@@ -131,7 +100,7 @@ export default function AchievementsScreen() {
             >
               <View style={styles.categoryHeader}>
                 <View style={styles.categoryTitleRow}>
-                  <Icon size={24} color="#fbbf24" />
+                  <Icon size={24} color="#E0B252" />
                   <Text style={styles.categoryTitle}>{cat.name}</Text>
                 </View>
                 <Text style={styles.categoryPercentage}>{prog.percentage}%</Text>
@@ -161,7 +130,7 @@ export default function AchievementsScreen() {
       </TouchableOpacity>
 
       <View style={styles.categoryHeaderInline}>
-        <CategoryIcon size={28} color="#fbbf24" />
+        <CategoryIcon size={28} color="#E0B252" />
         <Text style={styles.title}>{currentCategory?.name}</Text>
       </View>
       <Text style={styles.subtitle}>
@@ -176,7 +145,7 @@ export default function AchievementsScreen() {
         return (
           <View key={def.id} style={styles.card} testID={`ach-${def.id}`}>
             <View style={styles.headerRow}>
-              <Icon size={20} color="#fbbf24" />
+              <Icon size={20} color="#E0B252" />
               <Text style={styles.cardTitle}>{def.title}</Text>
               <Text style={styles.achievementPercentage}>{percentage}%</Text>
             </View>
@@ -185,7 +154,7 @@ export default function AchievementsScreen() {
             <View style={styles.progressBarContainer}>
               {Array.from({ length: 5 }).map((_, idx) => {
                 const filled = idx < level;
-                const labels = ['basics','easy','médium','hard','expert'] as const;
+                const labels = ['basics','easy','medium','hard','expert'] as const;
                 return (
                   <View key={idx} style={styles.barSegment}>
                     <View style={[styles.barPiece, filled ? styles.barPieceFilled : styles.barPieceEmpty]} />
@@ -206,7 +175,7 @@ export default function AchievementsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0f',
+    backgroundColor: '#0B0A0D',
   },
   content: {
     padding: 16,
@@ -219,15 +188,15 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   subtitle: {
-    color: '#9ca3af',
+    color: '#A8A097',
     fontSize: 12,
     marginBottom: 16,
   },
   categoryCard: {
-    backgroundColor: '#111827',
+    backgroundColor: '#16131A',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#2C2733',
     padding: 16,
     marginBottom: 12,
   },
@@ -248,31 +217,31 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
   },
   categoryPercentage: {
-    color: '#4ade80',
+    color: '#E0B252',
     fontSize: 18,
     fontWeight: '700' as const,
   },
   categoryProgressBar: {
     height: 8,
-    backgroundColor: '#1f2937',
+    backgroundColor: '#2C2733',
     borderRadius: 4,
     overflow: 'hidden',
     marginBottom: 8,
   },
   categoryProgressFill: {
     height: '100%',
-    backgroundColor: '#4ade80',
+    backgroundColor: '#E0B252',
     borderRadius: 4,
   },
   categoryStats: {
-    color: '#9ca3af',
+    color: '#A8A097',
     fontSize: 12,
   },
   backButton: {
     marginBottom: 16,
   },
   backText: {
-    color: '#60a5fa',
+    color: '#E0B252',
     fontSize: 16,
     fontWeight: '600' as const,
   },
@@ -283,10 +252,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   card: {
-    backgroundColor: '#111827',
+    backgroundColor: '#16131A',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#2C2733',
     padding: 14,
     marginBottom: 12,
   },
@@ -303,12 +272,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   achievementPercentage: {
-    color: '#4ade80',
+    color: '#E0B252',
     fontSize: 14,
     fontWeight: '700' as const,
   },
   desc: {
-    color: '#cbd5e1',
+    color: '#E8E1D6',
     fontSize: 12,
     marginBottom: 12,
   },
@@ -328,20 +297,20 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   barPieceEmpty: {
-    backgroundColor: '#1f2937',
+    backgroundColor: '#2C2733',
   },
   barPieceFilled: {
-    backgroundColor: '#4ade80',
+    backgroundColor: '#E0B252',
   },
   barLabel: {
     fontSize: 9,
     textAlign: 'center',
   },
   barLabelOn: {
-    color: '#4ade80',
+    color: '#E0B252',
     fontWeight: '700' as const,
   },
   barLabelOff: {
-    color: '#64748b',
+    color: '#7A7269',
   },
 });

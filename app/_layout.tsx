@@ -1,10 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
 import React, { Component, ReactNode, useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { View, Text, StyleSheet } from "react-native";
-import { trpc, trpcClient } from "@/lib/trpc";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { useGameStore } from "@/store/gameStore";
+import { theme } from "@/constants/theme";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -15,12 +17,19 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   static getDerivedStateFromError() {
     return { hasError: true };
   }
+  componentDidCatch(error: unknown) {
+    console.error("Unhandled UI error", error);
+  }
   render() {
     if (this.state.hasError) {
       return (
         <View style={styles.errorContainer} accessibilityRole="alert" testID="global-error">
-          <Text style={styles.errorTitle}>Something went wrong</Text>
-          <Text style={styles.errorText}>Please reload the app.</Text>
+          <Text style={styles.errorIcon}>🚨</Text>
+          <Text style={styles.errorTitle}>The heat is on</Text>
+          <Text style={styles.errorText}>Something went wrong. Your progress is saved.</Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => this.setState({ hasError: false })}>
+            <Text style={styles.primaryButtonText}>Try again</Text>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -28,40 +37,44 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
+const screenHeader = {
+  headerStyle: { backgroundColor: theme.colors.bgElevated },
+  headerTintColor: theme.colors.text,
+  headerTitleStyle: { fontWeight: "800" as const },
+  headerShadowVisible: false,
+  contentStyle: { backgroundColor: theme.colors.bg },
+};
+
 function RootLayoutNav() {
   return (
-    <Stack screenOptions={{ headerBackTitle: "Back" }}>
+    <Stack screenOptions={{ headerBackTitle: "Back", contentStyle: { backgroundColor: theme.colors.bg } }}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="settings" options={{ title: "Settings", headerStyle: { backgroundColor: '#1a1a2e' }, headerTintColor: '#fff' }} />
-      <Stack.Screen name="profile" options={{ title: "Profile", headerStyle: { backgroundColor: '#1a1a2e' }, headerTintColor: '#fff' }} />
-      <Stack.Screen name="achievements" options={{ title: "Achievements", headerStyle: { backgroundColor: '#1a1a2e' }, headerTintColor: '#fff' }} />
-      <Stack.Screen name="combat" options={{ title: "Combat", headerStyle: { backgroundColor: '#1a1a2e' }, headerTintColor: '#fff' }} />
-      <Stack.Screen name="+not-found" />
+      <Stack.Screen name="settings" options={{ title: "Settings", ...screenHeader }} />
+      <Stack.Screen name="profile" options={{ title: "Profile", ...screenHeader }} />
+      <Stack.Screen name="achievements" options={{ title: "Achievements", ...screenHeader }} />
+      <Stack.Screen name="combat" options={{ title: "Turf War", ...screenHeader }} />
+      <Stack.Screen name="+not-found" options={{ title: "Lost", ...screenHeader }} />
     </Stack>
   );
 }
 
-function GlobalAlerts() {
-  const [visible, setVisible] = React.useState<boolean>(false);
-  const death = require("@/store/gameStore").useGameStore((s: any) => s.combatDeath);
-  const clearCombatDeath = require("@/store/gameStore").useGameStore((s: any) => s.clearCombatDeath);
+function CombatDeathAlert() {
+  const death = useGameStore(s => s.combatDeath);
+  const clearCombatDeath = useGameStore(s => s.clearCombatDeath);
 
-  React.useEffect(() => {
-    if (death) {
-      setVisible(true);
-    }
-  }, [death?.at]);
-
-  if (!death || !visible) return null as unknown as React.ReactElement;
+  if (!death) return null;
 
   return (
-    <View style={styles.alertOverlay} pointerEvents="box-none" testID="combat-death-overlay">
+    <View style={styles.alertOverlay} testID="combat-death-overlay">
       <View style={styles.alertCard} accessible accessibilityRole="alert">
-        <Text style={styles.alertTitle}>You were defeated</Text>
-        <Text style={styles.alertText}>Fallen to {death.enemyName}. Gear up and try again.</Text>
-        <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-          <Text onPress={() => { setVisible(false); clearCombatDeath(); }} style={styles.alertButton} testID="combat-death-dismiss">OK</Text>
-        </View>
+        <Text style={styles.alertIcon}>💀</Text>
+        <Text style={styles.alertTitle}>You got whacked</Text>
+        <Text style={styles.alertText}>
+          {death.enemyName} put you down. Upgrade your gear and hit the streets again.
+        </Text>
+        <TouchableOpacity style={[styles.primaryButton, { alignSelf: "stretch" }]} onPress={clearCombatDeath} testID="combat-death-dismiss">
+          <Text style={styles.primaryButtonText}>Patch up</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -73,63 +86,82 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>
-        <GestureHandlerRootView style={styles.root}>
-          <ErrorBoundary>
-            <>
-              <RootLayoutNav />
-              <GlobalAlerts />
-            </>
-          </ErrorBoundary>
-        </GestureHandlerRootView>
-      </QueryClientProvider>
-    </trpc.Provider>
+    <QueryClientProvider client={queryClient}>
+      <GestureHandlerRootView style={styles.root}>
+        <StatusBar style="light" />
+        <ErrorBoundary>
+          <>
+            <RootLayoutNav />
+            <CombatDeathAlert />
+          </>
+        </ErrorBoundary>
+      </GestureHandlerRootView>
+    </QueryClientProvider>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    backgroundColor: theme.colors.bg,
   },
   errorContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0a0a0f',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.bg,
     padding: 24,
   },
+  errorIcon: {
+    fontSize: 44,
+    marginBottom: 8,
+  },
   errorTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
+    color: theme.colors.text,
+    fontSize: 22,
+    fontWeight: "900",
     marginBottom: 6,
   },
   errorText: {
-    color: '#9ca3af',
+    color: theme.colors.textMuted,
     fontSize: 14,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  primaryButton: {
+    backgroundColor: theme.colors.gold,
+    paddingVertical: 13,
+    paddingHorizontal: 24,
+    borderRadius: theme.radius.md,
+    alignItems: "center",
+  },
+  primaryButtonText: {
+    color: "#1A1408",
+    fontWeight: "900",
+    fontSize: 15,
   },
   alertOverlay: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
     top: 0,
     bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.overlay,
     padding: 24,
   },
   alertCard: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: '#111827',
-    borderRadius: 12,
+    width: "100%",
+    maxWidth: 380,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.xl,
     borderWidth: 1,
-    borderColor: '#1f2937',
-    padding: 16,
+    borderColor: theme.colors.crimsonBorder,
+    padding: 22,
+    alignItems: "center",
   },
-  alertTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  alertText: { color: '#9ca3af', marginTop: 6 },
-  alertButton: { color: '#0b1220', backgroundColor: '#60a5fa', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, overflow: 'hidden', fontWeight: '700' },
+  alertIcon: { fontSize: 44, marginBottom: 6 },
+  alertTitle: { color: theme.colors.crimson, fontSize: 22, fontWeight: "900" },
+  alertText: { color: theme.colors.textMuted, marginTop: 8, marginBottom: 20, textAlign: "center", lineHeight: 20 },
 });

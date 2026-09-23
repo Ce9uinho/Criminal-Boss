@@ -131,7 +131,7 @@ export const MasteryPerksModal: React.FC<MasteryPerksModalProps> = ({
           <View style={styles.header}>
             <Text style={styles.title}>Mastery Perks</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <X size={20} color="#ccc" />
+              <X size={20} color="#D4CCC1" />
             </TouchableOpacity>
           </View>
           
@@ -158,7 +158,7 @@ export const MasteryPerksModal: React.FC<MasteryPerksModalProps> = ({
                   <View style={styles.perkHeader}>
                     <View style={styles.perkLevel}>
                       {isUnlocked ? (
-                        <CheckCircle size={12} color="#4CAF50" />
+                        <CheckCircle size={12} color="#3DD68C" />
                       ) : (
                         <Clock size={12} color="#999" />
                       )}
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     maxHeight: '80%',
     padding: 12,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#3E3648',
   },
   header: {
     flexDirection: 'row',
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#ccc',
+    color: '#D4CCC1',
     marginBottom: 6,
   },
   currentLevel: {
@@ -245,14 +245,14 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     padding: 8,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#3E3648',
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: 50,
   },
   perkItemUnlocked: {
-    backgroundColor: '#1a3a1a',
-    borderColor: '#4CAF50',
+    backgroundColor: '#15291F',
+    borderColor: '#3DD68C',
   },
   perkHeader: {
     alignItems: 'center',
@@ -271,10 +271,10 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   perkLevelTextUnlocked: {
-    color: '#4CAF50',
+    color: '#3DD68C',
   },
   activeBadge: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3DD68C',
     paddingHorizontal: 4,
     paddingVertical: 1,
     borderRadius: 6,
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
   },
   perkDescription: {
     fontSize: 10,
-    color: '#ccc',
+    color: '#D4CCC1',
     lineHeight: 13,
     flex: 1,
   },
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 11,
-    color: '#aaa',
+    color: '#A8A097',
     lineHeight: 14,
     marginBottom: 12,
     textAlign: 'center',

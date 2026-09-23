@@ -237,7 +237,7 @@ export default function SkillGrid({ selectedSkill, onSelectSkill, onNavigateToSt
             <Animated.View style={[
               styles.xpProgressBar,
               {
-                shadowColor: '#ffd700',
+                shadowColor: '#E0B252',
                 shadowOpacity: xpBarGlow,
                 shadowRadius: xpBarGlow.interpolate({
                   inputRange: [0, 1],
@@ -260,7 +260,7 @@ export default function SkillGrid({ selectedSkill, onSelectSkill, onNavigateToSt
                     }),
                     backgroundColor: xpBarGlow.interpolate({
                       inputRange: [0, 1],
-                      outputRange: ['#ffd700', '#ffed4e'],
+                      outputRange: ['#E0B252', '#ffed4e'],
                     }),
                   }
                 ]}
@@ -337,13 +337,13 @@ export default function SkillGrid({ selectedSkill, onSelectSkill, onNavigateToSt
               <View style={styles.cardFooter}>
                 {isLocked ? (
                   <>
-                    <Lock size={14} color="#ef4444" />
+                    <Lock size={14} color="#E5484D" />
                     <Text style={styles.lockedText}>LV {activity.levelRequired}</Text>
                   </>
                 ) : (
                   <View style={styles.masteryContainer}>
                     <View style={styles.masteryInfo}>
-                      <Trophy size={14} color="#fbbf24" />
+                      <Trophy size={14} color="#E0B252" />
                       <Text style={styles.masteryText}>
                         Mastery {getMasteryPercentage(activity.id).toFixed(1)}%
                       </Text>
@@ -352,7 +352,7 @@ export default function SkillGrid({ selectedSkill, onSelectSkill, onNavigateToSt
                       style={styles.masteryButton}
                       onPress={() => setSelectedMasteryItem({ name: resource.name, activityId: activity.id })}
                     >
-                      <Info size={16} color="#94a3b8" />
+                      <Info size={16} color="#A8A097" />
                     </TouchableOpacity>
                   </View>
                 )}
@@ -386,16 +386,16 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   skillHeader: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    shadowColor: '#ffd700',
+    shadowColor: '#E0B252',
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 8,
   },
@@ -410,7 +410,7 @@ const styles = StyleSheet.create({
   },
   skillLevel: {
     fontSize: 14,
-    color: '#4ade80',
+    color: '#E0B252',
     fontWeight: '600',
   },
   skillHeaderRight: {
@@ -426,15 +426,15 @@ const styles = StyleSheet.create({
   xpText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#ffd700',
+    color: '#E0B252',
   },
   xpToNext: {
     fontSize: 11,
-    color: '#888',
+    color: '#8F877E',
   },
   xpProgressBar: {
     height: 6,
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     borderRadius: 3,
     overflow: 'hidden',
     width: '100%',
@@ -442,16 +442,16 @@ const styles = StyleSheet.create({
   },
   xpProgressFill: {
     height: '100%',
-    backgroundColor: '#ffd700',
+    backgroundColor: '#E0B252',
     borderRadius: 3,
   },
   levelInfo: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
   },
   levelHeader: {
     flexDirection: 'row',
@@ -462,17 +462,17 @@ const styles = StyleSheet.create({
   levelText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#4ade80',
+    color: '#E0B252',
   },
   progressBar: {
     height: 8,
-    backgroundColor: '#2a2a3e',
+    backgroundColor: '#2C2733',
     borderRadius: 4,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#4ade80',
+    backgroundColor: '#E0B252',
     borderRadius: 4,
   },
   grid: {
@@ -482,27 +482,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   card: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
     padding: 16,
     minHeight: 180,
   },
   activeCard: {
-    borderColor: '#4ade80',
-    backgroundColor: 'rgba(74, 222, 128, 0.05)',
+    borderColor: '#E0B252',
+    backgroundColor: 'rgba(224, 178, 82, 0.05)',
   },
   lockedCard: {
     opacity: 0.6,
-    borderColor: '#ef4444',
+    borderColor: '#E5484D',
   },
   cardHeader: {
     marginBottom: 12,
   },
   actionText: {
     fontSize: 10,
-    color: '#64748b',
+    color: '#7A7269',
     marginBottom: 4,
     fontWeight: '600',
   },
@@ -526,24 +526,24 @@ const styles = StyleSheet.create({
   },
   xpPerAction: {
     fontSize: 12,
-    color: '#4ade80',
+    color: '#E0B252',
     fontWeight: '600',
     marginBottom: 2,
   },
   timePerAction: {
     fontSize: 11,
-    color: '#94a3b8',
+    color: '#A8A097',
   },
   progressContainer: {
     height: 3,
-    backgroundColor: '#2a2a3e',
+    backgroundColor: '#2C2733',
     borderRadius: 2,
     marginVertical: 8,
     overflow: 'hidden',
   },
   activityProgress: {
     height: '100%',
-    backgroundColor: '#4ade80',
+    backgroundColor: '#E0B252',
   },
   cooldownOverlay: {
     position: 'absolute',
@@ -570,12 +570,12 @@ const styles = StyleSheet.create({
   },
   // Heat styles
   heatContainer: {
-    backgroundColor: 'rgba(255, 107, 107, 0.05)',
+    backgroundColor: 'rgba(229, 72, 77, 0.05)',
     borderRadius: 8,
     padding: 10,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 107, 0.2)',
+    borderColor: 'rgba(229, 72, 77, 0.2)',
   },
   heatHeader: {
     flexDirection: 'row',
@@ -586,23 +586,23 @@ const styles = StyleSheet.create({
   heatLabel: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#ff6b6b',
+    color: '#E5484D',
   },
   heatValue: {
     fontSize: 16,
     fontWeight: 'bold',
   },
   heatLow: {
-    color: '#4ade80',
+    color: '#E0B252',
   },
   heatMedium: {
-    color: '#fbbf24',
+    color: '#E0B252',
   },
   heatHigh: {
     color: '#fb923c',
   },
   heatCritical: {
-    color: '#ef4444',
+    color: '#E5484D',
   },
   heatBarContainer: {
     height: 6,
@@ -616,28 +616,28 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   heatFillLow: {
-    backgroundColor: '#4ade80',
+    backgroundColor: '#E0B252',
   },
   heatFillMedium: {
-    backgroundColor: '#fbbf24',
+    backgroundColor: '#E0B252',
   },
   heatFillHigh: {
     backgroundColor: '#fb923c',
   },
   heatFillCritical: {
-    backgroundColor: '#ef4444',
+    backgroundColor: '#E5484D',
   },
   heatDescription: {
     fontSize: 11,
-    color: '#aaa',
+    color: '#A8A097',
     fontStyle: 'italic',
   },
   toolsCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#111827',
-    borderColor: '#1f2937',
+    backgroundColor: '#16131A',
+    borderColor: '#2C2733',
     borderWidth: 1,
     borderRadius: 10,
     paddingVertical: 12,
@@ -645,10 +645,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   toolsLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  toolsTitle: { color: '#e5e7eb', fontWeight: '700', fontSize: 14, marginLeft: 8 },
+  toolsTitle: { color: '#E8E1D6', fontWeight: '700', fontSize: 14, marginLeft: 8 },
   toolsRight: { alignItems: 'flex-end' },
-  toolsEquippedText: { color: '#4ade80', fontWeight: '800', fontSize: 13 },
-  toolsHint: { color: '#94a3b8', fontSize: 11 },
+  toolsEquippedText: { color: '#E0B252', fontWeight: '800', fontSize: 13 },
+  toolsHint: { color: '#A8A097', fontSize: 11 },
 
   cardFooter: {
     flexDirection: 'row',
@@ -668,7 +668,7 @@ const styles = StyleSheet.create({
   },
   masteryText: {
     fontSize: 10,
-    color: '#fbbf24',
+    color: '#E0B252',
     fontWeight: '500',
   },
   masteryButton: {
@@ -677,7 +677,7 @@ const styles = StyleSheet.create({
   },
   lockedText: {
     fontSize: 10,
-    color: '#ef4444',
+    color: '#E5484D',
     fontWeight: 'bold',
   },
   emptyState: {
@@ -688,6 +688,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: '#6F685F',
   },
 });
