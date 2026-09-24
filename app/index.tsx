@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, AppState, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useGameStore } from '@/store/gameStore';
 import SkillGrid from '@/components/SkillGrid';
@@ -12,6 +12,9 @@ import { BottomNav } from '@/components/BottomNav';
 import { MobileHeader } from '@/components/MobileHeader';
 import { SkillHeader } from '@/components/SkillHeader';
 import { SkillList } from '@/components/SkillList';
+import { GameNotices } from '@/components/GameNotices';
+import { WelcomeBackModal } from '@/components/WelcomeBackModal';
+import { theme } from '@/constants/theme';
 
 type ViewType = 'skills' | 'bank' | 'shop' | 'combat';
 
@@ -21,12 +24,35 @@ export default function GameScreen() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [showGameMenu, setShowGameMenu] = useState(false);
   const [targetResourceId, setTargetResourceId] = useState<string | undefined>(undefined);
-  const { skills, loadGame, gold, getPlayerLevelAvg } = useGameStore();
+  const skills = useGameStore(s => s.skills);
+  const loadGame = useGameStore(s => s.loadGame);
+  const gold = useGameStore(s => s.gold);
+  const getPlayerLevelAvg = useGameStore(s => s.getPlayerLevelAvg);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
     loadGame();
   }, [loadGame]);
+
+  // Persist progress whenever the app is backgrounded or the tab is closed, so
+  // nothing earned since the last 30s autosave is lost.
+  useEffect(() => {
+    const save = () => { void useGameStore.getState().saveGame(); };
+    const sub = AppState.addEventListener('change', next => {
+      if (next !== 'active') save();
+    });
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', save);
+      window.addEventListener('pagehide', save);
+    }
+    return () => {
+      sub.remove();
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.removeEventListener('beforeunload', save);
+        window.removeEventListener('pagehide', save);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -114,10 +140,7 @@ export default function GameScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-
-      {showGameMenu && <GameMenu onClose={() => setShowGameMenu(false)} />}
-
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <MobileHeader
         selectedSkill={selectedSkill}
         playerLevel={getPlayerLevel()}
@@ -125,22 +148,7 @@ export default function GameScreen() {
         onShowGameMenu={() => setShowGameMenu(true)}
       />
 
-      <BottomNav
-        currentView={currentView}
-        selectedSkill={selectedSkill}
-        onSetCurrentView={handleSetCurrentView}
-        onShowSidebar={() => setShowSidebar(!showSidebar)}
-      />
-
       <View style={styles.mainContent} testID="main-content">
-        {showSidebar && (
-            <SkillList
-                selectedSkill={selectedSkill}
-                onSetSelectedSkill={setSelectedSkill}
-                onClose={() => setShowSidebar(false)}
-            />
-        )}
-        
         <View style={styles.contentArea}>
           {currentView === 'skills' && selectedSkill && (
             <SkillHeader selectedSkill={selectedSkill} />
@@ -150,12 +158,32 @@ export default function GameScreen() {
               {renderContent()}
             </View>
           ) : (
-            <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false} testID="scroll-content">
+            <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollInner} showsVerticalScrollIndicator={false} testID="scroll-content">
               {renderContent()}
             </ScrollView>
           )}
         </View>
+
+        {showSidebar && (
+          <SkillList
+            selectedSkill={selectedSkill}
+            onSetSelectedSkill={setSelectedSkill}
+            onClose={() => setShowSidebar(false)}
+          />
+        )}
       </View>
+
+      <BottomNav
+        currentView={currentView}
+        selectedSkill={selectedSkill}
+        onSetCurrentView={handleSetCurrentView}
+        onShowSidebar={() => setShowSidebar(!showSidebar)}
+        bottomInset={insets.bottom}
+      />
+
+      {showGameMenu && <GameMenu onClose={() => setShowGameMenu(false)} />}
+      <GameNotices top={insets.top + 60} />
+      <WelcomeBackModal />
     </View>
   );
 }
@@ -163,7 +191,7 @@ export default function GameScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0f',
+    backgroundColor: theme.colors.bg,
   },
   mainContent: {
     flex: 1,
@@ -171,9 +199,12 @@ const styles = StyleSheet.create({
   },
   contentArea: {
     flex: 1,
-    backgroundColor: '#0f0f1a',
+    backgroundColor: theme.colors.bg,
   },
   scrollContent: {
     flex: 1,
+  },
+  scrollInner: {
+    paddingBottom: 24,
   },
 });

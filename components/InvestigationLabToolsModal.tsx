@@ -22,12 +22,12 @@ export default function InvestigationLabToolsModal({ visible, onClose }: Props) 
         <View style={styles.modal}>
           <View style={styles.header}>
             <View style={styles.titleRow}>
-              <Wrench size={16} color="#4ade80" />
+              <Wrench size={16} color="#E0B252" />
               <Text style={styles.title}>Lab Sets</Text>
             </View>
             <View style={styles.headerRight}>
               <TouchableOpacity onPress={onClose} style={styles.closeBtn} testID="investigation-lab-tools-close">
-                <X size={18} color="#bbb" />
+                <X size={18} color="#BDB5AA" />
               </TouchableOpacity>
             </View>
           </View>
@@ -118,37 +118,37 @@ export default function InvestigationLabToolsModal({ visible, onClose }: Props) 
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 16 },
-  modal: { width: '100%', maxWidth: 460, backgroundColor: '#0f0f1a', borderRadius: 14, borderWidth: 1, borderColor: '#223', padding: 14 },
+  modal: { width: '100%', maxWidth: 460, backgroundColor: '#0E0C11', borderRadius: 14, borderWidth: 1, borderColor: '#2C2733', padding: 14 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: { color: '#fff', fontSize: 16, fontWeight: '700' },
   headerRight: { flexDirection: 'row', alignItems: 'center' },
 
   closeBtn: { padding: 6 },
-  helper: { color: '#9ca3af', fontSize: 11, marginBottom: 8, fontStyle: 'italic', textAlign: 'center' },
+  helper: { color: '#A8A097', fontSize: 11, marginBottom: 8, fontStyle: 'italic', textAlign: 'center' },
   list: { maxHeight: 520 },
   listContent: { paddingVertical: 4 },
-  card: { backgroundColor: '#151826', borderWidth: 1, borderColor: '#233', borderRadius: 12, padding: 12, marginBottom: 10 },
+  card: { backgroundColor: '#18151D', borderWidth: 1, borderColor: '#2C2733', borderRadius: 12, padding: 12, marginBottom: 10 },
   rowTop: { flexDirection: 'row', alignItems: 'center' },
   icon: { fontSize: 22, marginRight: 10 },
   meta: { flex: 1 },
-  name: { color: '#e5e7eb', fontWeight: '700', fontSize: 14 },
-  tier: { color: '#9ca3af', fontSize: 11, marginTop: 2 },
-  statusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(148,163,184,0.12)' },
+  name: { color: '#E8E1D6', fontWeight: '700', fontSize: 14 },
+  tier: { color: '#A8A097', fontSize: 11, marginTop: 2 },
+  statusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(168, 160, 151,0.12)' },
   statusText: { fontSize: 11, fontWeight: '700' },
   owned: { color: '#fde68a' },
-  eq: { color: '#4ade80' },
-  locked: { color: '#fca5a5' },
+  eq: { color: '#E0B252' },
+  locked: { color: '#F2A3A5' },
   bonusesRow: { marginTop: 8 },
   bonus: { color: '#a3e635', fontSize: 11, marginRight: 8 },
-  reqBox: { marginTop: 10, backgroundColor: '#0b0f1f', borderRadius: 8, borderWidth: 1, borderColor: '#1f2937', padding: 10 },
+  reqBox: { marginTop: 10, backgroundColor: '#0E0C11', borderRadius: 8, borderWidth: 1, borderColor: '#2C2733', padding: 10 },
   reqRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   reqIcon: { fontSize: 18, marginRight: 8 },
   reqText: { fontSize: 12 },
-  reqOk: { color: '#d1fae5' },
-  reqMissing: { color: '#fca5a5' },
+  reqOk: { color: '#F6E7C1' },
+  reqMissing: { color: '#F2A3A5' },
   actions: { marginTop: 10, alignItems: 'flex-end' },
-  btn: { backgroundColor: '#22c55e', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
-  btnDisabled: { backgroundColor: '#164e2b' },
-  btnText: { color: '#0b0f1f', fontWeight: '800' },
+  btn: { backgroundColor: '#3DD68C', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
+  btnDisabled: { backgroundColor: '#3A2E14' },
+  btnText: { color: '#0E0C11', fontWeight: '800' },
 });

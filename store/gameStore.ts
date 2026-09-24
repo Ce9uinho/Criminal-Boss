@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { GameState, Skill, Activity, BankItem, Mastery, SmugglingZone, BankTab, EquipmentSlot } from '@/types/game';
-import { getLevelFromXp, RESOURCES, hasRequiredInputs, SKILL_DESCRIPTIONS, getSmugglingXp, getXpForLevel, STORE_ITEMS, EQUIPMENT_CATALOG } from '@/constants/gameData';
+import { getLevelFromXp, RESOURCES, hasRequiredInputs, SKILL_DESCRIPTIONS, getSmugglingXp, getXpForLevel, STORE_ITEMS, EQUIPMENT_CATALOG, ACTIVITIES, SMUGGLING_ZONES } from '@/constants/gameData';
+import { COMBAT_DUNGEONS, getDungeonGoldReward, getPlayerCombatStats, getPlayerAttackIntervalMs } from '@/constants/combat';
 import { THIEVING_TOOLS } from '@/constants/thievingTools';
 import { DRUG_TOOLS } from '@/constants/drugTools';
 import { DISTILLERY_TOOLS } from '@/constants/distilleryTools';
@@ -135,7 +136,7 @@ interface GameStore extends GameState {
   getMasteryTimeReduction: (activityId: string) => number;
   getActualTime: (skillId: string, baseTime: number, activityId: string) => number;
   getThievingMasteryBonus: (activityId: string) => { failureReduction: number; cooldownReduction: number; lootBonus: number; heatReduction: number; };
-  processOfflineProgress: () => void;
+  processOfflineProgress: (resume?: { skillId: string; activityId: string }) => void;
   sortBank: () => void;
   sellItem: (resourceId: string, quantity: number) => void;
   addGold: (amount: number) => void;
@@ -172,6 +173,141 @@ interface GameStore extends GameState {
 
   // UI signals
   lastGroupedAt?: number;
+
+  // Player-facing notifications (level ups, full bank, purchases...)
+  notices: GameNotice[];
+  pushNotice: (notice: Omit<GameNotice, 'id'>) => void;
+  dismissNotice: (id: string) => void;
+
+  // Summary of what happened while the player was away
+  offlineSummary?: OfflineSummary;
+  clearOfflineSummary: () => void;
+  getAdjustedActionTime: (skillId: string, baseTime: number, activityId: string) => number;
+
+  // Lifetime counters that feed achievements
+  lifetimeStats: LifetimeStats;
+  recordProduced: (skillId: string, amount: number) => void;
+
+  // Save management
+  exportSave: () => string;
+  importSave: (raw: string) => Promise<boolean>;
+  resetGame: () => Promise<void>;
+}
+
+export interface LifetimeStats {
+  produced: Record<string, number>; // crafted items per skill, successful thefts for thieving
+  rareCollected: number; // rare smuggling finds
+}
+
+export interface GameNotice {
+  id: string;
+  kind: 'levelup' | 'agent' | 'warning' | 'success' | 'info';
+  title: string;
+  message?: string;
+  icon?: string;
+  skillId?: string;
+}
+
+export interface OfflineSummary {
+  elapsedMs: number;
+  cappedMs: number;
+  skillId: string;
+  activityName: string;
+  actions: number;
+  xp: number;
+  levelBefore: number;
+  levelAfter: number;
+  gold: number;
+  items: { resourceId: string; quantity: number }[];
+  consumed: { resourceId: string; quantity: number }[];
+}
+
+// Offline progress is capped so returning players get a meaningful reward without
+// making active play pointless.
+export const MAX_OFFLINE_MS = 12 * 60 * 60 * 1000;
+const MIN_OFFLINE_MS = 60 * 1000;
+
+// The slot array is the single source of truth for the inventory. The keyed `bank`
+// map is always derived from it so crafting checks, the shop and the bank grid can
+// never disagree about how many of an item the player owns.
+export function bankFromItems(items: (BankItem | null)[]): Record<string, BankItem> {
+  const out: Record<string, BankItem> = {};
+  for (const it of items) {
+    if (!it || it.quantity <= 0) continue;
+    const prev = out[it.resourceId]?.quantity ?? 0;
+    out[it.resourceId] = { resourceId: it.resourceId, quantity: prev + it.quantity };
+  }
+  return out;
+}
+
+// Removes `quantity` of a resource across every slot holding it. Returns false when
+// the player doesn't own enough (and leaves `items` untouched in that case).
+function removeFromItems(items: (BankItem | null)[], resourceId: string, quantity: number): boolean {
+  const total = items.reduce((sum, it) => sum + (it?.resourceId === resourceId ? it.quantity : 0), 0);
+  if (total < quantity) return false;
+  let remaining = quantity;
+  for (let i = items.length - 1; i >= 0 && remaining > 0; i--) {
+    const it = items[i];
+    if (!it || it.resourceId !== resourceId) continue;
+    const take = Math.min(it.quantity, remaining);
+    remaining -= take;
+    items[i] = it.quantity - take > 0 ? { resourceId, quantity: it.quantity - take } : null;
+  }
+  return true;
+}
+
+// Adds a resource to the first slot holding it, else the first empty slot.
+// Returns false when the bank is full.
+function addToItems(items: (BankItem | null)[], resourceId: string, quantity: number): boolean {
+  const existing = items.findIndex(it => it?.resourceId === resourceId);
+  if (existing !== -1) {
+    items[existing] = { resourceId, quantity: (items[existing]?.quantity ?? 0) + quantity };
+    return true;
+  }
+  const empty = items.findIndex(it => !it || it.quantity <= 0);
+  if (empty === -1) return false;
+  items[empty] = { resourceId, quantity };
+  return true;
+}
+
+function padItems(items: (BankItem | null)[], cap: number): (BankItem | null)[] {
+  const out = [...items];
+  while (out.length < cap) out.push(null);
+  // Never drop owned items when trimming: only trailing empties can go.
+  while (out.length > cap && out[out.length - 1] == null) out.pop();
+  return out;
+}
+
+let lastBankFullNotice = 0;
+
+const isCashId = (id: string) => id === 'loose_change' || id === 'cash';
+
+type ToolRequirement = { resourceId: string; quantity: number };
+
+// Shared purchase flow for every skill's tool shop.
+function payRequirements(
+  state: { gold: number; bankItems: (BankItem | null)[] },
+  requirements: ToolRequirement[],
+): { gold: number; bankItems: (BankItem | null)[] } | null {
+  const items = [...state.bankItems];
+  let gold = state.gold;
+  for (const req of requirements) {
+    if (isCashId(req.resourceId)) {
+      if (gold < req.quantity) return null;
+      gold -= req.quantity;
+    } else if (!removeFromItems(items, req.resourceId, req.quantity)) {
+      return null;
+    }
+  }
+  return { gold, bankItems: items };
+}
+
+export function resolveActivity(skillId: string, activityId: string): Activity | undefined {
+  return ACTIVITIES[skillId]?.find(a => a.id === activityId);
+}
+
+export function resolveZone(activityId: string): SmugglingZone | undefined {
+  return SMUGGLING_ZONES.find(z => `smuggling_${z.id}` === activityId);
 }
 
 const INITIAL_SKILLS: Record<string, Skill> = {
@@ -246,26 +382,76 @@ const INITIAL_BANK_ITEMS: (BankItem | null)[] = [
   { resourceId: 'fake_documents', quantity: 15 },
   { resourceId: 'stolen_electronics', quantity: 7 },
   { resourceId: 'pile_of_junk', quantity: 5 },
-
-  // Starter combat gear to test equipping
-  { resourceId: 'iron_dagger', quantity: 1 },
-  { resourceId: 'wooden_shield', quantity: 1 },
-  { resourceId: 'leather_cap', quantity: 1 },
-  { resourceId: 'leather_vest', quantity: 1 },
-  { resourceId: 'leather_pants', quantity: 1 },
-  { resourceId: 'leather_boots', quantity: 1 },
-  { resourceId: 'simple_ring', quantity: 1 },
-  { resourceId: 'street_amulet', quantity: 1 },
-  
-  // Fill remaining slots with null (empty) - exactly 30 total slots
-  ...Array.from({ length: 30 - 26 }, () => null) // 26 items + 4 empty = 30 total
 ];
 
-export const useGameStore = create<GameStore>((set, get) => ({
+// New bosses start with their street kit already on, so the first Turf War fight
+// is winnable without a trip through the bank.
+const STARTER_EQUIPMENT: Partial<Record<EquipmentSlot, string>> = {
+  weapon: 'iron_dagger',
+  offhand: 'wooden_shield',
+  helmet: 'leather_cap',
+  chest: 'leather_vest',
+  legs: 'leather_pants',
+  boots: 'leather_boots',
+  ring: 'simple_ring',
+  amulet: 'street_amulet',
+};
+
+export const useGameStore = create<GameStore>((rawSet, get) => {
+  // Every state write goes through here so `bank` stays in sync with `bankItems`.
+  const set = ((partial: any, replace?: boolean) =>
+    rawSet((state: GameStore) => {
+      const next = typeof partial === 'function' ? partial(state) : partial;
+      if (next && Array.isArray(next.bankItems)) {
+        return { ...next, bank: bankFromItems(next.bankItems) };
+      }
+      return next;
+    }, replace as any)) as typeof rawSet;
+
+  const acquireTool = (
+    tools: { id: string; name: string; icon: string; requirements: ToolRequirement[] }[],
+    toolId: string,
+    ownedKey: 'thievingToolsOwned' | 'smugglingToolsOwned' | 'drugToolsOwned' | 'distilleryToolsOwned' | 'investigationLabToolsOwned',
+    equippedKey: 'equippedThievingToolId' | 'equippedSmugglingToolId' | 'equippedDrugToolId' | 'equippedDistilleryToolId' | 'equippedInvestigationLabToolId',
+  ) => {
+    const tool = tools.find(t => t.id === toolId);
+    if (!tool) return;
+    const state = get();
+    if (state[ownedKey]?.[toolId]) return;
+    const paid = payRequirements(state, tool.requirements);
+    if (!paid) {
+      get().pushNotice({ kind: 'warning', title: 'Not enough resources', message: 'You are missing materials or cash for this upgrade.' });
+      return;
+    }
+    set((s: GameStore) => ({
+      gold: paid.gold,
+      bankItems: paid.bankItems,
+      [ownedKey]: { ...s[ownedKey], [toolId]: true },
+      // Tools are bought in tier order, so a new one is always an upgrade: equip it.
+      [equippedKey]: toolId,
+    }) as Partial<GameStore>);
+    get().pushNotice({ kind: 'success', title: 'Upgrade acquired', message: tool.name, icon: tool.icon });
+    setTimeout(() => get().groupItems(), 50);
+    setTimeout(() => get().saveGame(), 100);
+  };
+
+  // Stops every production skill and any pending thieving auto-restart.
+  const haltAllSkills = () => {
+    const { skills, stopActivity } = get();
+    Object.keys(skills).forEach(id => {
+      if (skills[id].isActive) stopActivity(id);
+    });
+    rawSet({ thievingAutoResume: false, currentThievingActivity: undefined });
+  };
+
+  return {
   skills: INITIAL_SKILLS,
-  bank: {},
+  bank: bankFromItems(INITIAL_BANK_ITEMS),
+  notices: [],
+  offlineSummary: undefined,
+  lifetimeStats: { produced: {}, rareCollected: 0 },
   bankItems: INITIAL_BANK_ITEMS,
-  equipped: {},
+  equipped: STARTER_EQUIPMENT,
   combatIsActive: false,
   combatDungeonId: 'back_alley',
   combatEnemyIndex: 0,
@@ -352,7 +538,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   loadGame: async () => {
     try {
-      const savedGame = await AsyncStorage.getItem('melvor-idle-save');
+      const savedGame = await AsyncStorage.getItem(SAVE_KEY);
       if (savedGame) {
         const gameData: GameState & { playerName?: string; playerIcon?: string; maxBankSlots?: number } = JSON.parse(savedGame);
         // Migrate old bank format to new format if needed
@@ -370,7 +556,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const validItems = bankItems.filter(item => item !== null && item && item.quantity > 0);
         const desiredSlots = Math.max(30, (gameData.maxBankSlots ?? 30));
         const finalBankItems: (BankItem | null)[] = [];
-        for (let i = 0; i < desiredSlots; i++) {
+        // Never discard owned items, even if the save somehow holds more stacks than slots.
+        for (let i = 0; i < Math.max(desiredSlots, validItems.length); i++) {
           if (i < validItems.length) {
             finalBankItems.push(validItems[i]);
           } else {
@@ -382,6 +569,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         
         // Merge saved skills with initial skills to ensure descriptions are added
         const mergedSkills = { ...INITIAL_SKILLS } as Record<string, Skill>;
+        let resume: { skillId: string; activityId: string } | undefined;
         Object.keys(gameData.skills).forEach(skillId => {
           if (mergedSkills[skillId]) {
             const saved = gameData.skills[skillId] as Skill;
@@ -393,6 +581,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
             // Recompute level from XP with new XP table
             const exp = mergedSkills[skillId].experience ?? 0;
             mergedSkills[skillId].level = getLevelFromXp(exp);
+            // Timers don't survive a reload: remember what was running and restart it
+            // properly (with its real definition) once the state is loaded.
+            if (saved.isActive && saved.currentActivity?.id && !resume) {
+              resume = { skillId, activityId: saved.currentActivity.id };
+            }
+            mergedSkills[skillId].isActive = false;
+            mergedSkills[skillId].currentActivity = undefined;
           }
         });
         
@@ -407,7 +602,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           activeBankTab: gameData.activeBankTab || 'all',
           mastery: gameData.mastery || {},
           lastSaved: gameData.lastSaved || Date.now(),
-          gold: (gameData as any).gold || 1000,
+          gold: typeof (gameData as any).gold === 'number' ? (gameData as any).gold : 1000,
           premiumCurrency: (gameData as any).premiumCurrency ?? 0,
           heat: gameData.heat || 0,
           arrestedUntil: gameData.arrestedUntil || 0,
@@ -433,10 +628,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
           lastAdWatchedAt: (gameData as any).lastAdWatchedAt,
           combatLastTab: ((gameData as any).combatLastTab as 'equipment'|'combat'|'dungeons') ?? 'combat',
           combatSelectedDungeon: (gameData as any).combatSelectedDungeon ?? 'back_alley',
+          lifetimeStats: {
+            produced: (gameData as any).lifetimeStats?.produced ?? {},
+            rareCollected: (gameData as any).lifetimeStats?.rareCollected ?? 0,
+          },
         });
         
-        // Process offline progress
-        get().processOfflineProgress();
+        // Process offline progress, then pick the activity back up
+        get().processOfflineProgress(resume);
+        if (resume) {
+          const zone = resume.skillId === 'smuggling' ? resolveZone(resume.activityId) : undefined;
+          const activity = zone ? undefined : resolveActivity(resume.skillId, resume.activityId);
+          if (zone) get().startSmugglingZone(zone);
+          else if (activity) get().startActivity(resume.skillId, activity);
+        }
+        if (get().heat > 0) get().startHeatDecay();
       } else {
         const desiredSlots = get().maxBankSlots;
         const finalBankItems: (BankItem | null)[] = [];
@@ -511,8 +717,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         equipped,
         combatLastTab,
         combatSelectedDungeon,
-      };
-      await AsyncStorage.setItem('melvor-idle-save', JSON.stringify(gameData));
+        lifetimeStats: get().lifetimeStats,
+      } as typeof gameData & { lifetimeStats: LifetimeStats };
+      await AsyncStorage.setItem(SAVE_KEY, JSON.stringify(gameData));
       setTimeout(() => {
         try {
           set({ lastSaved: Date.now() });
@@ -525,190 +732,98 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
 
+  getAdjustedActionTime: (skillId: string, baseTime: number, activityId: string) => {
+    const base = get().getActualTime(skillId, baseTime, activityId);
+    const mult = (() => {
+      if (skillId === 'drug_factory') return get().getDrugToolBonuses().timeReductionMultiplier;
+      if (skillId === 'distillery') return get().getDistilleryToolBonuses().timeReductionMultiplier;
+      if (skillId === 'investigation_lab') return get().getInvestigationLabToolBonuses().timeReductionMultiplier;
+      if (skillId === 'smuggling') return get().getSmugglingToolBonuses().timeReductionMultiplier;
+      return 1;
+    })();
+    return Math.max(100, Math.floor(base * (mult ?? 1)));
+  },
+
   startActivity: (skillId: string, activity: Activity) => {
-    const { skills, activeTimers, stopActivity, bank, thievingCooldowns } = get();
+    const { skills, thievingCooldowns } = get();
     try {
       get().stopBackgroundCombat();
       set({ combatAutoResume: false, combatSnapshot: undefined, combatIsActive: false });
     } catch (e) {
       console.log('stop combat on startActivity failed', e);
     }
-    
-    // Per-activity cooldown check for thieving
-    if (skillId === 'thieving') {
-      // Track the currently selected thieving activity
-      set({ currentThievingActivity: activity });
-      
-      const until = thievingCooldowns?.[activity.id];
-      if (until && until > Date.now()) {
-        const remaining = Math.ceil((until - Date.now()) / 1000);
-        console.log(`Thieving activity '${activity.id}' on cooldown: ${remaining}s remaining`);
-        
-        // If auto-resume is enabled, schedule restart after cooldown
-        if (get().thievingAutoResume) {
-          const remainingTime = until - Date.now();
-          console.log(`Scheduling restart in ${remainingTime}ms for ${activity.name}`);
-          setTimeout(() => {
-            const state = get();
-            // Only restart if this is still the selected activity AND no other activity is running
-            if (state.thievingAutoResume && 
-                state.currentThievingActivity?.id === activity.id &&
-                !state.skills.thieving.isActive) {
-              console.log(`Cooldown ended, restarting ${activity.name}`);
-              get().restartThievingAfterCooldown(activity);
-            }
-          }, remainingTime);
-        }
-        return;
-      }
-    }
-    
-    // Stop all other active skills first
-    Object.keys(skills).forEach((id) => {
-      if (skills[id].isActive) {
-        stopActivity(id);
-      }
-    });
 
-    // Calculate activity time based on level and mastery
     const skill = skills[skillId];
-
-    // Check if player meets level requirement
-    if (skill.level < activity.levelRequired) {
+    if (!skill || skill.level < activity.levelRequired) {
       console.log('Cannot start activity: level requirement not met');
       return;
     }
 
-    // Compute adjusted inputs for drug factory based on equipped tool
-    const drugToolB = skillId === 'drug_factory' ? get().getDrugToolBonuses() : undefined;
-    const adjustedInputs = (() => {
-      if (!activity.inputs || activity.inputs.length === 0) return activity.inputs;
-      if (skillId === 'drug_factory') {
-        const mult = Math.max(0, drugToolB?.inputReductionMultiplier ?? 1);
-        const reduced = activity.inputs.map(inp => ({ resourceId: inp.resourceId, quantity: Math.max(1, Math.ceil(inp.quantity * mult)) }));
-        if ((drugToolB?.inputSaveChance ?? 0) > 0 && Math.random() < (drugToolB?.inputSaveChance ?? 0)) {
-          const idx = 0;
-          reduced[idx] = { resourceId: reduced[idx].resourceId, quantity: Math.max(0, reduced[idx].quantity - 1) };
-        }
-        return reduced;
-      }
-      if (skillId === 'distillery') {
-        const mult = Math.max(0, (get().getDistilleryToolBonuses().inputReductionMultiplier));
-        const distB = get().getDistilleryToolBonuses();
-        const reduced = activity.inputs.map(inp => ({ resourceId: inp.resourceId, quantity: Math.max(1, Math.ceil(inp.quantity * mult)) }));
-        if ((distB.inputSaveChance ?? 0) > 0 && Math.random() < distB.inputSaveChance) {
-          const idx = 0;
-          reduced[idx] = { resourceId: reduced[idx].resourceId, quantity: Math.max(0, reduced[idx].quantity - 1) };
-        }
-        return reduced;
-      }
-      if (skillId === 'investigation_lab') {
-        const labB = get().getInvestigationLabToolBonuses();
-        const mult = Math.max(0, labB.inputReductionMultiplier);
-        const reduced = activity.inputs.map(inp => ({ resourceId: inp.resourceId, quantity: Math.max(1, Math.ceil(inp.quantity * mult)) }));
-        if ((labB.inputSaveChance ?? 0) > 0 && Math.random() < (labB.inputSaveChance ?? 0)) {
-          const idx = 0;
-          reduced[idx] = { resourceId: reduced[idx].resourceId, quantity: Math.max(0, reduced[idx].quantity - 1) };
-        }
-        return reduced;
-      }
-      return activity.inputs;
-    })();
-
-    // Check if we have required inputs BEFORE starting the activity
-    if (activity.inputs && activity.inputs.length > 0) {
-      const ok = adjustedInputs ? hasRequiredInputs(bank, { ...activity, inputs: adjustedInputs }) : hasRequiredInputs(bank, activity);
-      if (!ok) {
-        console.log('Cannot start activity: missing required inputs');
+    // Per-activity cooldown check for thieving
+    if (skillId === 'thieving') {
+      const until = thievingCooldowns?.[activity.id];
+      if (until && until > Date.now()) {
+        haltAllSkills();
+        // Queue the target: it starts by itself as soon as the cooldown ends.
+        set({ currentThievingActivity: activity, thievingAutoResume: true });
+        setTimeout(() => {
+          const state = get();
+          if (state.thievingAutoResume &&
+              state.currentThievingActivity?.id === activity.id &&
+              !state.skills.thieving.isActive) {
+            get().restartThievingAfterCooldown(activity);
+          }
+        }, until - Date.now());
         return;
       }
     }
 
-    const baseActualTime = get().getActualTime(skillId, activity.baseTime, activity.id);
-    const distToolB = skillId === 'distillery' ? get().getDistilleryToolBonuses() : undefined;
-    const labToolB = skillId === 'investigation_lab' ? get().getInvestigationLabToolBonuses() : undefined;
-    const adjustedTime = (() => {
-      if (skillId === 'drug_factory') return Math.max(100, Math.floor(baseActualTime * (drugToolB?.timeReductionMultiplier ?? 1)));
-      if (skillId === 'distillery') return Math.max(100, Math.floor(baseActualTime * (distToolB?.timeReductionMultiplier ?? 1)));
-      if (skillId === 'investigation_lab') return Math.max(100, Math.floor(baseActualTime * (labToolB?.timeReductionMultiplier ?? 1)));
-      return baseActualTime;
-    })();
-    console.log(`Starting activity with normal timing: ${adjustedTime}ms`);
+    const isCrafting = skillId === 'drug_factory' || skillId === 'distillery' || skillId === 'investigation_lab';
+    const getCraftBonuses = () => {
+      if (skillId === 'drug_factory') return get().getDrugToolBonuses();
+      if (skillId === 'distillery') return get().getDistilleryToolBonuses();
+      if (skillId === 'investigation_lab') return get().getInvestigationLabToolBonuses();
+      return undefined;
+    };
+    // Inputs actually charged per cycle once tool reductions apply.
+    const getCycleInputs = (rollSave: boolean) => {
+      if (!activity.inputs || activity.inputs.length === 0) return [] as { resourceId: string; quantity: number }[];
+      const b = getCraftBonuses();
+      if (!b) return activity.inputs;
+      const mult = Math.max(0, b.inputReductionMultiplier ?? 1);
+      const reduced = activity.inputs.map(inp => ({ resourceId: inp.resourceId, quantity: Math.max(1, Math.ceil(inp.quantity * mult)) }));
+      if (rollSave && (b.inputSaveChance ?? 0) > 0 && Math.random() < (b.inputSaveChance ?? 0)) {
+        reduced[0] = { resourceId: reduced[0].resourceId, quantity: Math.max(0, reduced[0].quantity - 1) };
+      }
+      return reduced;
+    };
+
+    if (activity.inputs && activity.inputs.length > 0 && !hasRequiredInputs(get().bank, { ...activity, inputs: getCycleInputs(false) })) {
+      console.log('Cannot start activity: missing required inputs');
+      get().pushNotice({ kind: 'warning', title: 'Missing materials', message: `You need more materials for ${activity.name}.` });
+      return;
+    }
+
+    // Only one thing runs at a time: stop other skills and any queued thieving restart.
+    haltAllSkills();
+    if (skillId === 'thieving') {
+      set({ currentThievingActivity: activity });
+    }
+
+    const adjustedTime = get().getAdjustedActionTime(skillId, activity.baseTime, activity.id);
 
     const timer = setInterval(() => {
-      const { addExperience, addResource, addMasteryExperience, consumeInputs, bank, addGold } = get();
+      const { addExperience, addResource, addMasteryExperience, consumeInputs, addGold } = get();
+      const craftB = isCrafting ? getCraftBonuses() : undefined;
 
-      // Prepare adjusted inputs each tick for drug factory
-      const localDrugToolB = skillId === 'drug_factory' ? get().getDrugToolBonuses() : undefined;
-      const localDistToolB = skillId === 'distillery' ? get().getDistilleryToolBonuses() : undefined;
-      const localLabToolB = skillId === 'investigation_lab' ? get().getInvestigationLabToolBonuses() : undefined;
-      const tickAdjustedInputs = (() => {
-        if (!activity.inputs || activity.inputs.length === 0) return activity.inputs;
-        if (skillId === 'drug_factory') {
-          const mult = Math.max(0, localDrugToolB?.inputReductionMultiplier ?? 1);
-          const reduced = activity.inputs.map(inp => ({ resourceId: inp.resourceId, quantity: Math.max(1, Math.ceil(inp.quantity * mult)) }));
-          if ((localDrugToolB?.inputSaveChance ?? 0) > 0 && Math.random() < (localDrugToolB?.inputSaveChance ?? 0)) {
-            const idx = 0;
-            reduced[idx] = { resourceId: reduced[idx].resourceId, quantity: Math.max(0, reduced[idx].quantity - 1) };
-          }
-          return reduced;
-        }
-        if (skillId === 'distillery') {
-          const mult = Math.max(0, localDistToolB?.inputReductionMultiplier ?? 1);
-          const reduced = activity.inputs.map(inp => ({ resourceId: inp.resourceId, quantity: Math.max(1, Math.ceil(inp.quantity * mult)) }));
-          if ((localDistToolB?.inputSaveChance ?? 0) > 0 && Math.random() < (localDistToolB?.inputSaveChance ?? 0)) {
-            const idx = 0;
-            reduced[idx] = { resourceId: reduced[idx].resourceId, quantity: Math.max(0, reduced[idx].quantity - 1) };
-          }
-          return reduced;
-        }
-        if (skillId === 'investigation_lab') {
-          const mult = Math.max(0, localLabToolB?.inputReductionMultiplier ?? 1);
-          const reduced = activity.inputs.map(inp => ({ resourceId: inp.resourceId, quantity: Math.max(1, Math.ceil(inp.quantity * mult)) }));
-          if ((localLabToolB?.inputSaveChance ?? 0) > 0 && Math.random() < (localLabToolB?.inputSaveChance ?? 0)) {
-            const idx = 0;
-            reduced[idx] = { resourceId: reduced[idx].resourceId, quantity: Math.max(0, reduced[idx].quantity - 1) };
-          }
-          return reduced;
-        }
-        return activity.inputs;
-      })();
-
-      // Check if we have required inputs BEFORE processing this cycle
       if (activity.inputs && activity.inputs.length > 0) {
-        const ok = skillId === 'drug_factory' && tickAdjustedInputs ? hasRequiredInputs(bank, { ...activity, inputs: tickAdjustedInputs }) : hasRequiredInputs(bank, activity);
-        if (!ok) {
-          console.log('Missing required inputs, stopping activity');
+        if (!consumeInputs(getCycleInputs(true))) {
           get().stopActivity(skillId);
+          get().pushNotice({ kind: 'warning', title: 'Out of materials', message: `${activity.name} stopped. Restock in the Shop.`, skillId });
           return;
         }
       }
 
-      // Consume inputs for this cycle
-      if (activity.inputs) {
-        const toConsume = (skillId === 'drug_factory' || skillId === 'distillery' || skillId === 'investigation_lab') && tickAdjustedInputs ? tickAdjustedInputs : activity.inputs;
-        const consumed = consumeInputs(toConsume as { resourceId: string; quantity: number }[]);
-        if (!consumed) {
-          console.log('Failed to consume inputs, stopping activity');
-          get().stopActivity(skillId);
-          return;
-        }
-      }
-
-      // After consuming inputs, check if we still have enough for the NEXT cycle
-      // This prevents the "one extra cycle" issue
-      const currentBank = get().bank;
-      if (activity.inputs && activity.inputs.length > 0) {
-        const okNext = tickAdjustedInputs ? hasRequiredInputs(currentBank, { ...activity, inputs: tickAdjustedInputs }) : hasRequiredInputs(currentBank, activity);
-        if (!okNext) {
-          console.log('Insufficient inputs for next cycle, stopping activity after this completion');
-          // Process this cycle normally, but stop after it
-          setTimeout(() => {
-            get().stopActivity(skillId);
-          }, 0);
-        }
-      }
-      
       // Check for getting caught (thieving only)
       if (skillId === 'thieving') {
         const { heat } = get();
@@ -843,12 +958,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
       
       // Success - handle thieving loot table or normal resource
+      let xpFactor = 1;
       if (skillId === 'thieving' && activity.lootTable) {
         const { heat, skills } = get();
         const agentActive = skills.thieving.agentUnlocked ?? false;
         const heatPenalty = heat >= 100 ? 0.5 : 1.0;
         const toolB3 = get().getThievingToolBonuses();
         
+        get().recordProduced('thieving', 1);
         // 1) Guaranteed cash payout
         const cashEntry = activity.lootTable.find(l => l.resourceId === 'cash' || l.resourceId === 'loose_change');
         if (cashEntry) {
@@ -909,34 +1026,40 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const agentActive = get().skills[skillId]?.agentUnlocked ?? false;
         let effectiveFailChance = baseFailChance;
         if (skillId !== 'thieving' && agentActive) effectiveFailChance = Math.max(0, effectiveFailChance - 10);
-        if (skillId === 'drug_factory') effectiveFailChance = Math.max(0, Math.min(100, effectiveFailChance * (localDrugToolB?.failureReductionMultiplier ?? 1)));
-        if (skillId === 'distillery') effectiveFailChance = Math.max(0, Math.min(100, effectiveFailChance * (localDistToolB?.failureReductionMultiplier ?? 1)));
-        if (skillId === 'investigation_lab') effectiveFailChance = Math.max(0, Math.min(100, effectiveFailChance * (localLabToolB?.failureReductionMultiplier ?? 1)));
+        if (skillId === 'drug_factory') effectiveFailChance = Math.max(0, Math.min(100, effectiveFailChance * (craftB?.failureReductionMultiplier ?? 1)));
+        if (skillId === 'distillery') effectiveFailChance = Math.max(0, Math.min(100, effectiveFailChance * (craftB?.failureReductionMultiplier ?? 1)));
+        if (skillId === 'investigation_lab') effectiveFailChance = Math.max(0, Math.min(100, effectiveFailChance * (craftB?.failureReductionMultiplier ?? 1)));
         const failed = Math.random() * 100 < effectiveFailChance;
         if (failed) {
-          const xpToAward = activity.getDynamicXp ? activity.getDynamicXp(get().skills[skillId].level) : activity.baseXp;
-          addExperience(skillId, Math.floor(xpToAward * 0.1));
+          // A botched batch still teaches you something, but only a fraction.
+          xpFactor = 0.1;
         } else {
           let outMult = 1;
-          if (skillId === 'drug_factory') outMult = Math.max(1, Math.floor(localDrugToolB?.outputMultiplier ?? 1));
-          if (skillId === 'distillery') outMult = Math.max(1, Math.floor(localDistToolB?.outputMultiplier ?? 1));
-          if (skillId === 'investigation_lab') outMult = Math.max(1, Math.floor(localLabToolB?.outputMultiplier ?? 1));
+          if (skillId === 'drug_factory') outMult = Math.max(1, Math.floor(craftB?.outputMultiplier ?? 1));
+          if (skillId === 'distillery') outMult = Math.max(1, Math.floor(craftB?.outputMultiplier ?? 1));
+          if (skillId === 'investigation_lab') outMult = Math.max(1, Math.floor(craftB?.outputMultiplier ?? 1));
           const managerBonus = (skillId !== 'thieving' && agentActive) ? 1 : 0;
           const quantityToAdd = Math.max(1, outMult + managerBonus);
           addResource(activity.resource.id, quantityToAdd);
+          get().recordProduced(skillId, quantityToAdd);
         }
       }
       
       const xpToAward = activity.getDynamicXp ? activity.getDynamicXp(get().skills[skillId].level) : activity.baseXp;
-      addExperience(skillId, xpToAward);
+      addExperience(skillId, Math.floor(xpToAward * xpFactor));
       addMasteryExperience(activity.id, 1);
-      
+
       // Add heat for successful thieving activities (reduced with agent)
       if (skillId === 'thieving' && activity.heatGenerated) {
         const toolB = get().getThievingToolBonuses();
-        const baseHeat = activity.heatGenerated;
-        const heatAdd = Math.max(0, Math.floor(baseHeat * toolB.heatReductionMultiplier));
+        const heatAdd = Math.max(0, Math.floor(activity.heatGenerated * toolB.heatReductionMultiplier));
         get().addHeat(heatAdd);
+      }
+
+      // Stop gracefully once the next cycle can't be paid for.
+      if (activity.inputs && activity.inputs.length > 0 && !hasRequiredInputs(get().bank, { ...activity, inputs: getCycleInputs(false) })) {
+        get().stopActivity(skillId);
+        get().pushNotice({ kind: 'warning', title: 'Out of materials', message: `${activity.name} stopped. Restock in the Shop.`, skillId });
       }
     }, adjustedTime);
 
@@ -953,12 +1076,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
         ...state.activeTimers,
         [skillId]: timer,
       },
-      thievingAutoResume: skillId === 'thieving' ? true : state.thievingAutoResume,
+      thievingAutoResume: skillId === 'thieving',
     }));
-    
-    // Stop heat decay when thieving starts (heat should increase during active thieving)
+
+    // Heat only cools down while the player isn't thieving
     if (skillId === 'thieving') {
       get().stopHeatDecay();
+    } else {
+      get().startHeatDecay();
     }
   },
 
@@ -984,53 +1109,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     };
   },
 
-  acquireInvestigationLabTool: (toolId: string) => {
-    const state = get();
-    const tool = INVESTIGATION_LAB_TOOLS.find(t => t.id === toolId);
-    if (!tool) return;
-    for (const req of tool.requirements) {
-      const have = (req.resourceId === 'loose_change' || req.resourceId === 'cash') ? state.gold : (state.bank[req.resourceId]?.quantity ?? 0);
-      if (have < req.quantity) {
-        console.log('Not enough resources to acquire lab set', toolId, req.resourceId, 'need', req.quantity, 'have', have);
-        return;
-      }
-    }
-    set(s => {
-      const newBank = { ...s.bank };
-      const newBankItems = [...s.bankItems];
-      let newGold = s.gold;
-      tool.requirements.forEach(req => {
-        const isCash = req.resourceId === 'loose_change' || req.resourceId === 'cash';
-        if (isCash) {
-          newGold = Math.max(0, newGold - req.quantity);
-          return;
-        }
-        const current = newBank[req.resourceId]?.quantity ?? 0;
-        const updated = current - req.quantity;
-        if (updated <= 0) {
-          delete newBank[req.resourceId];
-        } else {
-          newBank[req.resourceId] = { resourceId: req.resourceId, quantity: updated };
-        }
-        const idx = newBankItems.findIndex(it => it?.resourceId === req.resourceId);
-        if (idx !== -1) {
-          const slotQty = (newBankItems[idx]?.quantity ?? 0) - req.quantity;
-          newBankItems[idx] = slotQty > 0 ? { resourceId: req.resourceId, quantity: slotQty } : null;
-        }
-      });
-      while (newBankItems.length < 30) newBankItems.push(null);
-      const trimmed = newBankItems.slice(0, 30);
-      return {
-        bank: newBank,
-        bankItems: trimmed,
-        gold: newGold,
-        investigationLabToolsOwned: { ...s.investigationLabToolsOwned, [toolId]: true },
-        equippedInvestigationLabToolId: s.equippedInvestigationLabToolId ?? toolId,
-      };
-    });
-    setTimeout(() => get().groupItems(), 50);
-    setTimeout(() => get().saveGame(), 100);
-  },
+  acquireInvestigationLabTool: (toolId: string) => acquireTool(INVESTIGATION_LAB_TOOLS, toolId, 'investigationLabToolsOwned', 'equippedInvestigationLabToolId'),
 
   equipInvestigationLabTool: (toolId: string) => {
     const { investigationLabToolsOwned } = get();
@@ -1060,53 +1139,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     };
   },
 
-  acquireSmugglingTool: (toolId: string) => {
-    const state = get();
-    const tool = SMUGGLING_TOOLS.find(t => t.id === toolId);
-    if (!tool) return;
-    for (const req of tool.requirements) {
-      const have = (req.resourceId === 'loose_change' || req.resourceId === 'cash') ? state.gold : (state.bank[req.resourceId]?.quantity ?? 0);
-      if (have < req.quantity) {
-        console.log('Not enough resources to acquire smuggling tool', toolId, req.resourceId, 'need', req.quantity, 'have', have);
-        return;
-      }
-    }
-    set(s => {
-      const newBank = { ...s.bank };
-      const newBankItems = [...s.bankItems];
-      let newGold = s.gold;
-      tool.requirements.forEach(req => {
-        const isCash = req.resourceId === 'loose_change' || req.resourceId === 'cash';
-        if (isCash) {
-          newGold = Math.max(0, newGold - req.quantity);
-          return;
-        }
-        const current = newBank[req.resourceId]?.quantity ?? 0;
-        const updated = current - req.quantity;
-        if (updated <= 0) {
-          delete newBank[req.resourceId];
-        } else {
-          newBank[req.resourceId] = { resourceId: req.resourceId, quantity: updated };
-        }
-        const idx = newBankItems.findIndex(it => it?.resourceId === req.resourceId);
-        if (idx !== -1) {
-          const slotQty = (newBankItems[idx]?.quantity ?? 0) - req.quantity;
-          newBankItems[idx] = slotQty > 0 ? { resourceId: req.resourceId, quantity: slotQty } : null;
-        }
-      });
-      while (newBankItems.length < 30) newBankItems.push(null);
-      const trimmed = newBankItems.slice(0, 30);
-      return {
-        bank: newBank,
-        bankItems: trimmed,
-        gold: newGold,
-        smugglingToolsOwned: { ...s.smugglingToolsOwned, [toolId]: true },
-        equippedSmugglingToolId: s.equippedSmugglingToolId ?? toolId,
-      };
-    });
-    setTimeout(() => get().groupItems(), 50);
-    setTimeout(() => get().saveGame(), 100);
-  },
+  acquireSmugglingTool: (toolId: string) => acquireTool(SMUGGLING_TOOLS, toolId, 'smugglingToolsOwned', 'equippedSmugglingToolId'),
 
   equipSmugglingTool: (toolId: string) => {
     const { smugglingToolsOwned } = get();
@@ -1116,28 +1149,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   startSmugglingZone: (zone: SmugglingZone) => {
-    const { skills, activeTimers, stopActivity } = get();
     try {
       get().stopBackgroundCombat();
       set({ combatAutoResume: false, combatSnapshot: undefined, combatIsActive: false });
     } catch (e) {
       console.log('stop combat on startSmugglingZone failed', e);
     }
-    
-    // Stop all other active skills first
-    Object.keys(skills).forEach((id) => {
-      if (skills[id].isActive) {
-        stopActivity(id);
-      }
-    });
 
     const skillId = 'smuggling';
-    const skill = skills[skillId];
+    if (get().skills.smuggling.level < zone.levelRequired) {
+      console.log('Cannot start smuggling zone: level requirement not met');
+      return;
+    }
 
-    const smugTool = get().getSmugglingToolBonuses();
-    const baseActual = get().getActualTime('smuggling', zone.baseTime, `smuggling_${zone.id}`);
-    const adjustedTime = Math.max(100, Math.floor(baseActual * (smugTool.timeReductionMultiplier ?? 1)));
-    console.log(`Starting smuggling with normal timing: ${adjustedTime}ms`);
+    haltAllSkills();
+
+    const adjustedTime = get().getAdjustedActionTime('smuggling', zone.baseTime, `smuggling_${zone.id}`);
 
     const timer = setInterval(() => {
       const { addExperience, addResource, addMasteryExperience, getMasteryLevel } = get();
@@ -1169,7 +1196,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const bonuses = get().getSmugglingToolBonuses();
         const availableItems = zone.items.map(it => ({
           ...it,
-          weight: it.minLevel ? Math.floor(it.weight * (bonuses.rareWeightMultiplier ?? 1)) : it.weight,
+          weight: it.minLevel ? it.weight * (bonuses.rareWeightMultiplier ?? 1) : it.weight,
         })).filter(item => !item.minLevel || playerLevel >= item.minLevel);
         if (availableItems.length === 0) {
           addResource('pile_of_junk', 1);
@@ -1183,6 +1210,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
           if (random <= 0) { selectedItem = item; break; }
         }
         addResource(selectedItem.resource.id, 1);
+        if (selectedItem.minLevel) {
+          set(state => ({ lifetimeStats: { ...state.lifetimeStats, rareCollected: state.lifetimeStats.rareCollected + 1 } }));
+        }
       }
       
       // Award XP scaled to match target time-to-levels irrespective of loot composition
@@ -1215,6 +1245,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       },
       currentSmugglingZone: zone,
     }));
+    get().startHeatDecay();
   },
 
   stopActivity: (skillId: string) => {
@@ -1264,13 +1295,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const newXp = currentXp + toAdd;
       const newLevel = getLevelFromXp(newXp);
       const justUnlockedAgent = !skill.agentUnlocked && newLevel >= 100;
+      const leveledUp = newLevel > (skill.level ?? 1);
 
-      // Defer toast to avoid nested set issues
+      // Defer side effects to avoid nested set issues
       setTimeout(() => {
         try {
           if (toAdd > 0) get().pushXpToast(toAdd, skillId);
+          if (leveledUp) {
+            get().pushNotice({ kind: 'levelup', title: `${skill.name} level ${newLevel}!`, message: 'New jobs and bonuses may be unlocked.', skillId });
+          }
+          if (justUnlockedAgent) {
+            get().pushNotice({ kind: 'agent', title: 'Agent recruited!', message: `A specialist now runs your ${skill.name} operation.`, skillId });
+          }
         } catch (e) {
-          console.log('pushXpToast failed', e);
+          console.log('notify failed', e);
         }
       }, 0);
 
@@ -1289,87 +1327,161 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   addResource: (resourceId: string, quantity: number) => {
+    if (quantity <= 0) return;
+    let full = false;
     set(state => {
-      const cap = get().maxBankSlots;
-      let newBankItems = [...state.bankItems];
-      while (newBankItems.length < cap) {
-        newBankItems.push(null);
+      const items = padItems(state.bankItems, state.maxBankSlots);
+      if (!addToItems(items, resourceId, quantity)) {
+        full = true;
+        return {};
       }
-      if (newBankItems.length > cap) {
-        newBankItems = newBankItems.slice(0, cap);
-      }
-      
-      // Update old bank format for backward compatibility
-      const newBank = {
-        ...state.bank,
-        [resourceId]: {
-          resourceId,
-          quantity: (state.bank[resourceId]?.quantity || 0) + quantity,
-        },
-      };
-      
-      // Find existing item
-      const existingIndex = newBankItems.findIndex(item => item?.resourceId === resourceId);
-      
-      if (existingIndex !== -1) {
-        // Update existing item
-        newBankItems[existingIndex] = {
-          resourceId,
-          quantity: (newBankItems[existingIndex]?.quantity || 0) + quantity,
-        };
-      } else {
-        // Find first empty slot
-        const emptyIndex = newBankItems.findIndex(item => item === null || (item && item.quantity <= 0));
-        if (emptyIndex !== -1) {
-          newBankItems[emptyIndex] = {
-            resourceId,
-            quantity,
-          };
-        } else {
-          console.log('Bank is full! Cannot add', resourceId);
-        }
-      }
-      
-      return {
-        bank: newBank,
-        bankItems: newBankItems,
-      };
+      return { bankItems: items };
     });
-    // Auto-group items after adding new resource
-    setTimeout(() => get().groupItems(), 100);
+    if (full) {
+      const now = Date.now();
+      // Throttle: a full bank would otherwise warn on every single action.
+      if (now - lastBankFullNotice > 8000) {
+        lastBankFullNotice = now;
+        get().pushNotice({ kind: 'warning', title: 'Bank is full!', message: `${RESOURCES[resourceId]?.name ?? 'Loot'} was lost. Sell items or buy more slots.` });
+      }
+    }
   },
 
-  processOfflineProgress: () => {
-    const { skills, lastSaved } = get();
-    const offlineTime = Date.now() - lastSaved;
-    const offlineHours = offlineTime / (1000 * 60 * 60);
-    
-    if (offlineHours < 0.1) return; // Less than 6 minutes, ignore
-    
-    console.log(`Processing ${offlineHours.toFixed(1)} hours of offline progress`);
-    
-    // Process each active skill
-    Object.values(skills).forEach(skill => {
-      if (skill.isActive && skill.currentActivity) {
-        const activity = skill.currentActivity;
-        const actualTime = get().getActualTime(skill.id, activity.baseTime, activity.id);
-        const completions = Math.floor(offlineTime / actualTime);
-        
-        if (completions > 0) {
-          if (skill.id === 'smuggling') {
-            const perAction = getSmugglingXp(skill.level, actualTime);
-            get().addExperience(skill.id, Math.max(1, Math.floor(perAction)) * completions);
-            // Smuggling generates variable loot; for offline, add placeholder junk to reflect activity minimally
-            get().addResource('pile_of_junk', completions);
-            get().addMasteryExperience(activity.id, completions);
-          } else {
-            const xpToAward = activity.getDynamicXp ? activity.getDynamicXp(skill.level) : activity.baseXp;
-            get().addExperience(skill.id, xpToAward * completions);
-            get().addResource(activity.resource.id, completions);
-            get().addMasteryExperience(activity.id, completions);
-          }
-        }
-      }
+  processOfflineProgress: (resume?: { skillId: string; activityId: string }) => {
+    const { lastSaved, skills } = get();
+    const elapsedMs = Math.max(0, Date.now() - lastSaved);
+    if (!resume || elapsedMs < MIN_OFFLINE_MS) return;
+    const skill = skills[resume.skillId];
+    if (!skill) return;
+    const cappedMs = Math.min(elapsedMs, MAX_OFFLINE_MS);
+
+    const gained: Record<string, number> = {};
+    const consumed: Record<string, number> = {};
+    const gain = (id: string, qty: number) => { if (qty > 0) gained[id] = (gained[id] ?? 0) + qty; };
+    // Probabilistic rounding keeps expected values honest for small counts.
+    const roundChance = (x: number) => Math.floor(x) + (Math.random() < x - Math.floor(x) ? 1 : 0);
+
+    let level = skill.level;
+    let xp = skill.experience ?? 0;
+    const levelBefore = level;
+    let actions = 0;
+    let goldGained = 0;
+    let activityName = '';
+    const awardXp = (amount: number) => {
+      xp += amount;
+      level = getLevelFromXp(xp);
+    };
+
+    if (resume.skillId === 'smuggling') {
+      const zone = resolveZone(resume.activityId);
+      if (!zone) return;
+      activityName = zone.name;
+      const actionTime = get().getAdjustedActionTime('smuggling', zone.baseTime, resume.activityId);
+      actions = Math.floor(cappedMs / actionTime);
+      const bonuses = get().getSmugglingToolBonuses();
+      const agent = skill.agentUnlocked ?? false;
+      const masteryLevel = get().getMasteryLevel(resume.activityId);
+      const masteryBonus = masteryLevel >= 100 ? 5 : masteryLevel >= 75 ? 3 : masteryLevel >= 50 ? 2 : masteryLevel >= 25 ? 1 : 0;
+      const perAction = 1 + masteryBonus + (bonuses.itemsPerActionBonus ?? 0) + (agent ? 1 : 0);
+      let junkChance = Math.max(0, Math.floor(zone.junkChance * (bonuses.junkReductionMultiplier ?? 1)));
+      if (agent) junkChance = Math.max(0, junkChance - 15);
+      const pool = zone.items
+        .filter(it => !it.minLevel || level >= it.minLevel)
+        .map(it => ({ id: it.resource.id, weight: it.minLevel ? it.weight * (bonuses.rareWeightMultiplier ?? 1) : it.weight }));
+      const totalWeight = pool.reduce((sum, it) => sum + it.weight, 0);
+      const rolls = actions * perAction;
+      gain('pile_of_junk', roundChance(rolls * junkChance / 100));
+      const goodRolls = rolls * (1 - junkChance / 100);
+      pool.forEach(it => gain(it.id, roundChance(goodRolls * it.weight / Math.max(1, totalWeight))));
+      for (let i = 0; i < actions; i++) awardXp(Math.max(1, Math.floor(getSmugglingXp(level, actionTime))));
+    } else if (resume.skillId === 'thieving') {
+      const activity = resolveActivity('thieving', resume.activityId);
+      if (!activity) return;
+      activityName = activity.name;
+      const actionTime = get().getAdjustedActionTime('thieving', activity.baseTime, activity.id);
+      // Approximate the live loop: each catch costs a cooldown before the next attempt.
+      const toolB = get().getThievingToolBonuses();
+      const mastery = get().getThievingMasteryBonus(activity.id);
+      const agent = skill.agentUnlocked ?? false;
+      let catchRate = (activity.failureChance ?? 0) * Math.max(0.5, Math.min(1.5, activity.levelRequired / 40));
+      catchRate *= mastery.failureReduction * toolB.failureReductionMultiplier * (agent ? 0.5 : 1);
+      catchRate = Math.min(95, Math.max(1, catchRate)) / 100;
+      const failCooldown = Math.min(15000 + activity.levelRequired * 500, 45000) * (agent ? 0.5 : 1) * toolB.cooldownReductionMultiplier;
+      const cycleMs = actionTime + catchRate * failCooldown;
+      actions = Math.floor(cappedMs / cycleMs);
+      const successes = Math.round(actions * (1 - catchRate));
+      get().recordProduced('thieving', successes);
+      const cash = activity.lootTable?.find(l => l.resourceId === 'cash' || l.resourceId === 'loose_change');
+      const avgCash = cash ? (cash.minQuantity + cash.maxQuantity) / 2 : 10;
+      goldGained = Math.floor(successes * avgCash * (toolB.lootBonusMultiplier || 1) * (agent ? 1.5 : 1));
+      const itemPool = (activity.lootTable ?? []).filter(l => l !== cash);
+      const poolWeight = itemPool.reduce((sum, l) => sum + Math.max(0, l.weight), 0);
+      itemPool.forEach(l => {
+        const pickChance = poolWeight > 0 ? l.weight / poolWeight : 0;
+        const dropChance = Math.min(1, l.weight * (toolB.lootBonusMultiplier || 1) / 100);
+        gain(l.resourceId, roundChance(successes * pickChance * dropChance * (l.minQuantity + l.maxQuantity) / 2));
+      });
+      const successXp = () => (activity.getDynamicXp ? activity.getDynamicXp(level) : activity.baseXp);
+      for (let i = 0; i < successes; i++) awardXp(successXp());
+      awardXp(Math.floor((actions - successes) * successXp() * 0.1));
+    } else {
+      const activity = resolveActivity(resume.skillId, resume.activityId);
+      if (!activity) return;
+      activityName = activity.name;
+      const actionTime = get().getAdjustedActionTime(resume.skillId, activity.baseTime, activity.id);
+      const craftB = resume.skillId === 'drug_factory' ? get().getDrugToolBonuses()
+        : resume.skillId === 'distillery' ? get().getDistilleryToolBonuses()
+        : get().getInvestigationLabToolBonuses();
+      const inputs = (activity.inputs ?? []).map(inp => ({
+        resourceId: inp.resourceId,
+        quantity: Math.max(1, Math.ceil(inp.quantity * Math.max(0, craftB.inputReductionMultiplier ?? 1))),
+      }));
+      // Offline crafting is limited by the materials in the bank, just like live play.
+      const bank = get().bank;
+      const affordable = inputs.reduce((min, inp) => Math.min(min, Math.floor((bank[inp.resourceId]?.quantity ?? 0) / inp.quantity)), Number.MAX_SAFE_INTEGER);
+      actions = Math.min(Math.floor(cappedMs / actionTime), affordable);
+      if (actions <= 0) return;
+      inputs.forEach(inp => { consumed[inp.resourceId] = inp.quantity * actions; });
+      const agent = skill.agentUnlocked ?? false;
+      let failChance = Math.max(0, (activity.failureChance ?? 0) - (agent ? 10 : 0));
+      failChance = Math.min(100, failChance * (craftB.failureReductionMultiplier ?? 1)) / 100;
+      const successes = Math.round(actions * (1 - failChance));
+      const perSuccess = Math.max(1, Math.floor(craftB.outputMultiplier ?? 1)) + (agent ? 1 : 0);
+      gain(activity.resource.id, successes * perSuccess);
+      get().recordProduced(resume.skillId, successes * perSuccess);
+      const baseXp = () => (activity.getDynamicXp ? activity.getDynamicXp(level) : activity.baseXp);
+      for (let i = 0; i < actions; i++) awardXp(i < successes ? baseXp() : Math.floor(baseXp() * 0.1));
+    }
+
+    if (actions <= 0) return;
+
+    // Apply everything in one go.
+    const items = padItems(get().bankItems, get().maxBankSlots);
+    Object.entries(consumed).forEach(([id, qty]) => removeFromItems(items, id, qty));
+    const lost: string[] = [];
+    Object.entries(gained).forEach(([id, qty]) => { if (!addToItems(items, id, qty)) lost.push(id); });
+    const xpGained = Math.max(0, xp - (skill.experience ?? 0));
+    set(state => ({
+      bankItems: items,
+      gold: state.gold + goldGained,
+    }));
+    get().addExperience(resume.skillId, Math.floor(xpGained / Math.max(1, get().gameSpeedMultiplier)));
+    get().addMasteryExperience(resume.activityId, actions);
+
+    set({
+      offlineSummary: {
+        elapsedMs,
+        cappedMs,
+        skillId: resume.skillId,
+        activityName,
+        actions,
+        xp: xpGained,
+        levelBefore,
+        levelAfter: get().skills[resume.skillId].level,
+        gold: goldGained,
+        items: Object.entries(gained).filter(([id]) => !lost.includes(id)).map(([resourceId, quantity]) => ({ resourceId, quantity })),
+        consumed: Object.entries(consumed).map(([resourceId, quantity]) => ({ resourceId, quantity })),
+      },
     });
   },
 
@@ -1465,57 +1577,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     };
   },
 
-  acquireThievingTool: (toolId: string) => {
-    const state = get();
-    const tool = THIEVING_TOOLS.find(t => t.id === toolId);
-    if (!tool) return;
-    // Check requirements (treat 'loose_change' as in-game cash stored in gold)
-    for (const req of tool.requirements) {
-      const have = req.resourceId === 'loose_change'
-        ? state.gold
-        : (state.bank[req.resourceId]?.quantity ?? 0);
-      if (have < req.quantity) {
-        console.log('Not enough resources to acquire tool', toolId, req.resourceId, 'need', req.quantity, 'have', have);
-        return;
-      }
-    }
-    // Consume
-    set(s => {
-      const newBank = { ...s.bank };
-      const newBankItems = [...s.bankItems];
-      let newGold = s.gold;
-      tool.requirements.forEach(req => {
-        const isCash = req.resourceId === 'loose_change' || req.resourceId === 'cash';
-        if (isCash) {
-          newGold = Math.max(0, newGold - req.quantity);
-          return;
-        }
-        const current = newBank[req.resourceId]?.quantity ?? 0;
-        const updated = current - req.quantity;
-        if (updated <= 0) {
-          delete newBank[req.resourceId];
-        } else {
-          newBank[req.resourceId] = { resourceId: req.resourceId, quantity: updated };
-        }
-        const idx = newBankItems.findIndex(it => it?.resourceId === req.resourceId);
-        if (idx !== -1) {
-          const slotQty = (newBankItems[idx]?.quantity ?? 0) - req.quantity;
-          newBankItems[idx] = slotQty > 0 ? { resourceId: req.resourceId, quantity: slotQty } : null;
-        }
-      });
-      while (newBankItems.length < 30) newBankItems.push(null);
-      const trimmed = newBankItems.slice(0, 30);
-      return {
-        bank: newBank,
-        bankItems: trimmed,
-        gold: newGold,
-        thievingToolsOwned: { ...s.thievingToolsOwned, [toolId]: true },
-        equippedThievingToolId: s.equippedThievingToolId ?? toolId,
-      };
-    });
-    setTimeout(() => get().groupItems(), 50);
-    setTimeout(() => get().saveGame(), 100);
-  },
+  acquireThievingTool: (toolId: string) => acquireTool(THIEVING_TOOLS, toolId, 'thievingToolsOwned', 'equippedThievingToolId'),
 
   equipThievingTool: (toolId: string) => {
     const { thievingToolsOwned } = get();
@@ -1546,53 +1608,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     };
   },
 
-  acquireDistilleryTool: (toolId: string) => {
-    const state = get();
-    const tool = DISTILLERY_TOOLS.find(t => t.id === toolId);
-    if (!tool) return;
-    for (const req of tool.requirements) {
-      const have = (req.resourceId === 'loose_change' || req.resourceId === 'cash') ? state.gold : (state.bank[req.resourceId]?.quantity ?? 0);
-      if (have < req.quantity) {
-        console.log('Not enough resources to acquire distillery tool', toolId, req.resourceId, 'need', req.quantity, 'have', have);
-        return;
-      }
-    }
-    set(s => {
-      const newBank = { ...s.bank };
-      const newBankItems = [...s.bankItems];
-      let newGold = s.gold;
-      tool.requirements.forEach(req => {
-        const isCash = req.resourceId === 'loose_change' || req.resourceId === 'cash';
-        if (isCash) {
-          newGold = Math.max(0, newGold - req.quantity);
-          return;
-        }
-        const current = newBank[req.resourceId]?.quantity ?? 0;
-        const updated = current - req.quantity;
-        if (updated <= 0) {
-          delete newBank[req.resourceId];
-        } else {
-          newBank[req.resourceId] = { resourceId: req.resourceId, quantity: updated };
-        }
-        const idx = newBankItems.findIndex(it => it?.resourceId === req.resourceId);
-        if (idx !== -1) {
-          const slotQty = (newBankItems[idx]?.quantity ?? 0) - req.quantity;
-          newBankItems[idx] = slotQty > 0 ? { resourceId: req.resourceId, quantity: slotQty } : null;
-        }
-      });
-      while (newBankItems.length < 30) newBankItems.push(null);
-      const trimmed = newBankItems.slice(0, 30);
-      return {
-        bank: newBank,
-        bankItems: trimmed,
-        gold: newGold,
-        distilleryToolsOwned: { ...s.distilleryToolsOwned, [toolId]: true },
-        equippedDistilleryToolId: s.equippedDistilleryToolId ?? toolId,
-      };
-    });
-    setTimeout(() => get().groupItems(), 50);
-    setTimeout(() => get().saveGame(), 100);
-  },
+  acquireDistilleryTool: (toolId: string) => acquireTool(DISTILLERY_TOOLS, toolId, 'distilleryToolsOwned', 'equippedDistilleryToolId'),
 
   equipDistilleryTool: (toolId: string) => {
     const { distilleryToolsOwned } = get();
@@ -1623,53 +1639,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     };
   },
 
-  acquireDrugTool: (toolId: string) => {
-    const state = get();
-    const tool = DRUG_TOOLS.find(t => t.id === toolId);
-    if (!tool) return;
-    for (const req of tool.requirements) {
-      const have = req.resourceId === 'loose_change' ? state.gold : (state.bank[req.resourceId]?.quantity ?? 0);
-      if (have < req.quantity) {
-        console.log('Not enough resources to acquire drug tool', toolId, req.resourceId, 'need', req.quantity, 'have', have);
-        return;
-      }
-    }
-    set(s => {
-      const newBank = { ...s.bank };
-      const newBankItems = [...s.bankItems];
-      let newGold = s.gold;
-      tool.requirements.forEach(req => {
-        const isCash = req.resourceId === 'loose_change' || req.resourceId === 'cash';
-        if (isCash) {
-          newGold = Math.max(0, newGold - req.quantity);
-          return;
-        }
-        const current = newBank[req.resourceId]?.quantity ?? 0;
-        const updated = current - req.quantity;
-        if (updated <= 0) {
-          delete newBank[req.resourceId];
-        } else {
-          newBank[req.resourceId] = { resourceId: req.resourceId, quantity: updated };
-        }
-        const idx = newBankItems.findIndex(it => it?.resourceId === req.resourceId);
-        if (idx !== -1) {
-          const slotQty = (newBankItems[idx]?.quantity ?? 0) - req.quantity;
-          newBankItems[idx] = slotQty > 0 ? { resourceId: req.resourceId, quantity: slotQty } : null;
-        }
-      });
-      while (newBankItems.length < 30) newBankItems.push(null);
-      const trimmed = newBankItems.slice(0, 30);
-      return {
-        bank: newBank,
-        bankItems: trimmed,
-        gold: newGold,
-        drugToolsOwned: { ...s.drugToolsOwned, [toolId]: true },
-        equippedDrugToolId: s.equippedDrugToolId ?? toolId,
-      };
-    });
-    setTimeout(() => get().groupItems(), 50);
-    setTimeout(() => get().saveGame(), 100);
-  },
+  acquireDrugTool: (toolId: string) => acquireTool(DRUG_TOOLS, toolId, 'drugToolsOwned', 'equippedDrugToolId'),
 
   equipDrugTool: (toolId: string) => {
     const { drugToolsOwned } = get();
@@ -1873,49 +1843,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       if (state.combatBgTimer) {
         clearInterval(state.combatBgTimer);
       }
-      const dungeons = [
-        { id: 'back_alley', enemyCount: 4, recommendedLevel: 1,
-          enemy: { hp: 30, attack: 6, defense: 2, attackSpeed: 1.6, accuracy: 70, evasion: 5, critChance: 5, critDamage: 150 },
-          boss: { hp: 100, attack: 14, defense: 8, attackSpeed: 1.4, accuracy: 75, evasion: 10, critChance: 10, critDamage: 175 },
-        },
-        { id: 'warehouse', enemyCount: 4, recommendedLevel: 10,
-          enemy: { hp: 90, attack: 14, defense: 8, attackSpeed: 1.5, accuracy: 75, evasion: 8, critChance: 8, critDamage: 160 },
-          boss: { hp: 150, attack: 26, defense: 14, attackSpeed: 1.2, accuracy: 80, evasion: 12, critChance: 15, critDamage: 200 },
-        },
-      ] as const;
-      const dungeon = dungeons.find(d => d.id === params.dungeonId) ?? dungeons[0];
-
-      const equipped = state.equipped || {} as Partial<Record<EquipmentSlot, string>>;
-      const baseStats = { hp: 100, attack: 10, defense: 5, accuracy: 80, evasion: 10, critChance: 5 };
-      const bonus = Object.entries(equipped).reduce<{ hp?: number; attack?: number; defense?: number; accuracy?: number; evasion?: number; critChance?: number }>((acc, [_slot, rid]) => {
-        if (!rid) return acc;
-        const item = (EQUIPMENT_CATALOG as any)[rid];
-        if (!item?.stats) return acc;
-        Object.entries(item.stats).forEach(([k, v]) => {
-          const key = k as keyof typeof acc;
-          acc[key] = (acc[key] ?? 0) + ((v as number) ?? 0);
-        });
-        return acc;
-      }, {});
-      const totalStats = {
-        hp: baseStats.hp + (bonus.hp ?? 0),
-        attack: baseStats.attack + (bonus.attack ?? 0),
-        defense: baseStats.defense + (bonus.defense ?? 0),
-        accuracy: baseStats.accuracy + (bonus.accuracy ?? 0),
-        evasion: baseStats.evasion + (bonus.evasion ?? 0),
-        critChance: baseStats.critChance + (bonus.critChance ?? 0),
-      };
-      const weaponId = equipped.weapon;
-      const weapon = weaponId ? (EQUIPMENT_CATALOG as any)[weaponId] : undefined;
-      const secPerAttack = typeof weapon?.attackSpeed === 'number' && weapon?.attackSpeed > 0 ? weapon.attackSpeed : 1.6;
-      const playerIntervalMs = Math.max(600, Math.floor(secPerAttack * 1000));
+      const dungeon = COMBAT_DUNGEONS.find(d => d.id === params.dungeonId) ?? COMBAT_DUNGEONS[0];
+      const totalStats = getPlayerCombatStats(state.equipped);
+      const playerIntervalMs = getPlayerAttackIntervalMs(state.equipped);
 
       const getEnemyForIndex = (idx: number) => (idx >= dungeon.enemyCount ? dungeon.boss : dungeon.enemy);
-      const enemyIntervalFor = (idx: number) => {
-        const e = getEnemyForIndex(idx);
-        const sec = (e.attackSpeed || 1.8);
-        return Math.max(600, Math.floor(sec * 1000));
-      };
+      const enemyIntervalFor = (idx: number) => Math.max(600, Math.floor((getEnemyForIndex(idx).attackSpeed || 1.8) * 1000));
 
       let enemyIndex = params.enemyIndex;
       let enemyHp = params.enemyHp;
@@ -1926,7 +1859,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       set({
         combatIsActive: true,
-        combatDungeonId: params.dungeonId,
+        combatDungeonId: dungeon.id,
         combatEnemyIndex: enemyIndex,
         combatEnemyHp: enemyHp,
         combatPlayerHp: playerHp,
@@ -1944,58 +1877,58 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
           if (lastPlayerMs >= playerIntervalMs) {
             lastPlayerMs -= playerIntervalMs;
-            const hitChance = Math.min(95, Math.max(5, totalStats.accuracy - (eStats.evasion ?? 0)));
+            const hitChance = Math.min(95, Math.max(5, totalStats.accuracy - eStats.evasion));
             const hit = Math.random() * 100 < hitChance;
             const base = totalStats.attack;
             const variance = Math.max(1, Math.floor(base * 0.15));
             const roll = base + Math.floor((Math.random() * variance - variance / 2));
-            const dmgRaw = Math.max(1, roll - Math.floor((eStats.defense ?? 0) / 2));
-            const crit = Math.random() * 100 < (totalStats.critChance ?? 0);
+            const dmgRaw = Math.max(1, roll - Math.floor(eStats.defense / 2));
+            const crit = Math.random() * 100 < totalStats.critChance;
             const dmg = hit ? Math.max(1, Math.floor(dmgRaw * (crit ? 1.5 : 1))) : 0;
             enemyHp = Math.max(0, enemyHp - dmg);
             if (enemyHp <= 0) {
               enemyIndex += 1;
-              const total = dungeon.enemyCount + 1;
-              if (enemyIndex >= total) {
-                console.log('Background combat: Dungeon completed! Awarding loot bag');
+              if (enemyIndex >= dungeon.enemyCount + 1) {
+                // Same rewards as the on-screen fight, then run the dungeon again.
+                const goldReward = getDungeonGoldReward(dungeon);
+                get().addGold(goldReward);
                 get().addResource('loot_bag', 1);
-                const bagCount = get().combatSessionItems['loot_bag'] ?? 0;
-                set({ combatSessionItems: { ...get().combatSessionItems, loot_bag: bagCount + 1 } });
-                set({ combatIsActive: false, combatSnapshot: undefined, combatAutoResume: false });
-                get().stopBackgroundCombat();
-                return;
+                const items = get().combatSessionItems;
+                set({
+                  combatSessionGold: get().combatSessionGold + goldReward,
+                  combatSessionItems: { ...items, loot_bag: (items['loot_bag'] ?? 0) + 1 },
+                });
+                enemyIndex = 0;
+                playerHp = totalStats.hp;
               }
-              const isBossNext = enemyIndex >= dungeon.enemyCount;
-              enemyHp = isBossNext ? (dungeon.boss.hp ?? 1) : (dungeon.enemy.hp ?? 1);
+              enemyHp = getEnemyForIndex(enemyIndex).hp;
             }
           }
 
           if (lastEnemyMs >= enemyIntervalFor(enemyIndex)) {
             lastEnemyMs -= enemyIntervalFor(enemyIndex);
             const e = getEnemyForIndex(enemyIndex);
-            const hitChanceE = Math.min(95, Math.max(5, (e.accuracy ?? 70) - totalStats.evasion));
+            const hitChanceE = Math.min(95, Math.max(5, e.accuracy - totalStats.evasion));
             const hitE = Math.random() * 100 < hitChanceE;
-            const baseE = e.attack ?? 5;
-            const varianceE = Math.max(1, Math.floor(baseE * 0.15));
-            const rollE = baseE + Math.floor((Math.random() * varianceE - varianceE / 2));
-            const critE = Math.random() * 100 < (e.critChance ?? 0);
+            const varianceE = Math.max(1, Math.floor(e.attack * 0.15));
+            const rollE = e.attack + Math.floor((Math.random() * varianceE - varianceE / 2));
+            const critE = Math.random() * 100 < e.critChance;
             const dmgRawE = Math.max(0, Math.floor(rollE - totalStats.defense / 3));
-            const dmgE = hitE ? Math.max(0, Math.floor(dmgRawE * (critE ? (e.critDamage ?? 150) / 100 : 1))) : 0;
+            const dmgE = hitE ? Math.max(0, Math.floor(dmgRawE * (critE ? e.critDamage / 100 : 1))) : 0;
             playerHp = Math.max(0, playerHp - dmgE);
             if (playerHp <= 0) {
               set({ combatIsActive: false, combatPlayerHp: 0, combatSnapshot: undefined, combatAutoResume: false });
-              try { get().setCombatDeath('Enemy'); } catch {}
+              get().setCombatDeath(e.name);
               get().stopBackgroundCombat();
               return;
             }
           }
 
           set({
-            combatDungeonId: params.dungeonId,
             combatEnemyIndex: enemyIndex,
             combatEnemyHp: enemyHp,
             combatPlayerHp: playerHp,
-            combatSnapshot: get().combatIsActive ? { dungeonId: params.dungeonId, enemyIndex, enemyHp, at: Date.now() } : undefined,
+            combatSnapshot: { dungeonId: dungeon.id, enemyIndex, enemyHp, at: Date.now() },
           });
         } catch (e) {
           console.log('Background combat tick error', e);
@@ -2180,56 +2113,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   consumeInputs: (inputs: { resourceId: string; quantity: number }[]) => {
-    const { bank } = get();
-    // Verify availability first
+    const items = [...get().bankItems];
     for (const input of inputs) {
-      const bankItem = bank[input.resourceId];
-      if (!bankItem || bankItem.quantity < input.quantity) {
-        return false;
-      }
+      if (input.quantity <= 0) continue;
+      if (!removeFromItems(items, input.resourceId, input.quantity)) return false;
     }
-
-    // Apply consumption to both bank map and bankItems array for UI sync
-    set(state => {
-      const newBank = { ...state.bank };
-      const newBankItems = [...state.bankItems];
-
-      for (const input of inputs) {
-        const currentQuantity = newBank[input.resourceId]?.quantity ?? 0;
-        const updatedQuantity = currentQuantity - input.quantity;
-
-        if (updatedQuantity <= 0) {
-          delete newBank[input.resourceId];
-        } else {
-          newBank[input.resourceId] = {
-            resourceId: input.resourceId,
-            quantity: updatedQuantity,
-          };
-        }
-
-        // Reflect changes in bankItems array (first matching slot)
-        const idx = newBankItems.findIndex(it => it?.resourceId === input.resourceId);
-        if (idx !== -1) {
-          const slotItem = newBankItems[idx];
-          const slotQty = (slotItem?.quantity ?? 0) - input.quantity;
-          if (slotQty <= 0) {
-            newBankItems[idx] = null;
-          } else {
-            newBankItems[idx] = { resourceId: input.resourceId, quantity: slotQty };
-          }
-        }
-      }
-
-      const cap2 = get().maxBankSlots;
-      while (newBankItems.length < cap2) newBankItems.push(null);
-      const trimmed = newBankItems.slice(0, cap2);
-
-      return { bank: newBank, bankItems: trimmed };
-    });
-
-    // Group after slight delay to compact empties
-    setTimeout(() => get().groupItems(), 50);
-
+    const emptiedSlot = items.some((it, i) => it === null && get().bankItems[i] !== null);
+    set({ bankItems: items });
+    if (emptiedSlot) setTimeout(() => get().groupItems(), 50);
     return true;
   },
 
@@ -2718,7 +2609,82 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const items = Object.entries(aggregated).map(([resourceId, quantity]) => ({ resourceId, quantity }));
     return { items, gold: totalGold };
   },
-}));
+
+  pushNotice: (notice) => {
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    set(state => ({ notices: [...state.notices.slice(-3), { ...notice, id }] }));
+    setTimeout(() => get().dismissNotice(id), notice.kind === 'levelup' || notice.kind === 'agent' ? 3500 : 2600);
+  },
+
+  dismissNotice: (id: string) => {
+    set(state => ({ notices: state.notices.filter(n => n.id !== id) }));
+  },
+
+  clearOfflineSummary: () => set({ offlineSummary: undefined }),
+
+  recordProduced: (skillId: string, amount: number) => {
+    if (amount <= 0) return;
+    set(state => ({
+      lifetimeStats: {
+        ...state.lifetimeStats,
+        produced: { ...state.lifetimeStats.produced, [skillId]: (state.lifetimeStats.produced[skillId] ?? 0) + amount },
+      },
+    }));
+  },
+
+  exportSave: () => {
+    const state = get();
+    const data: Record<string, unknown> = {};
+    Object.keys(initialData ?? {}).forEach(key => {
+      if (!TRANSIENT_KEYS.has(key)) data[key] = (state as any)[key];
+    });
+    return JSON.stringify({ ...data, lastSaved: Date.now(), exportedAt: new Date().toISOString(), version: SAVE_VERSION });
+  },
+
+  importSave: async (raw: string) => {
+    try {
+      const parsed = JSON.parse(raw.trim());
+      if (!parsed || typeof parsed !== 'object' || typeof parsed.skills !== 'object' || !Array.isArray(parsed.bankItems)) {
+        return false;
+      }
+      stopAllTimers();
+      // Imported saves shouldn't grant offline progress for the time they sat on disk.
+      await AsyncStorage.setItem(SAVE_KEY, JSON.stringify({ ...parsed, lastSaved: Date.now() }));
+      await get().loadGame();
+      get().pushNotice({ kind: 'success', title: 'Save imported', message: 'Welcome back, boss.' });
+      return true;
+    } catch (e) {
+      console.log('importSave failed', e);
+      return false;
+    }
+  },
+
+  resetGame: async () => {
+    stopAllTimers();
+    await AsyncStorage.removeItem(SAVE_KEY);
+    if (initialData) set({ ...initialData, lastSaved: Date.now(), isLoading: false } as Partial<GameStore>);
+    get().pushNotice({ kind: 'info', title: 'Fresh start', message: 'Your empire has been reset.' });
+  },
+  };
+});
+
+const SAVE_KEY = 'melvor-idle-save';
+const SAVE_VERSION = '1.1.0';
+// Runtime-only fields that must never be exported or restored.
+const TRANSIENT_KEYS = new Set(['activeTimers', 'heatDecayTimer', 'combatBgTimer', 'xpToasts', 'notices', 'offlineSummary', 'isLoading', 'bank']);
+
+// Snapshot of the pristine new-game state (data only), used by resetGame/exportSave.
+const initialData: Partial<GameStore> = Object.fromEntries(
+  Object.entries(useGameStore.getState()).filter(([, v]) => typeof v !== 'function'),
+) as Partial<GameStore>;
+
+function stopAllTimers() {
+  const st = useGameStore.getState();
+  Object.values(st.activeTimers).forEach(t => clearInterval(t));
+  if (st.combatBgTimer) clearInterval(st.combatBgTimer);
+  if (st.heatDecayTimer) clearInterval(st.heatDecayTimer);
+  useGameStore.setState({ activeTimers: {}, combatBgTimer: undefined, heatDecayTimer: undefined, combatIsActive: false });
+}
 
 // Auto-save every 30 seconds
 setInterval(() => {

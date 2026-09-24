@@ -1,18 +1,22 @@
 {
   "expo": {
-    "name": "CB Clone",
+    "name": "Criminal Boss",
     "slug": "melvor-idle-clone-rt0ovz6x",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
-    "platforms": ["ios", "android", "web"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0B0A0D"
     },
     "ios": {
       "supportsTablet": true,
@@ -21,13 +25,15 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#141118"
       },
       "package": "app.rork.melvor-idle-clone-rt0ovz6x"
     },
     "web": {
       "bundler": "metro",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "name": "Criminal Boss",
+      "themeColor": "#0B0A0D"
     },
     "plugins": [
       [
@@ -39,6 +45,7 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "backgroundColor": "#0B0A0D"
   }
 }

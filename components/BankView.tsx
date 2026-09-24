@@ -126,7 +126,7 @@ export default function BankView() {
           <View style={styles.bankInfo}>
             <Text style={styles.goldLabel}>GOLD</Text>
             <View style={styles.goldContainer}>
-              <Coins size={16} color="#fbbf24" />
+              <Coins size={16} color="#E0B252" />
               <Text style={styles.goldValue}>{formatCash(gold)}</Text>
             </View>
           </View>
@@ -135,7 +135,7 @@ export default function BankView() {
             onPress={() => setIsBankReorderMode(!isBankReorderMode)}
             testID="reorder-items-button"
           >
-            <Package size={16} color={isBankReorderMode ? "#10b981" : "#888"} />
+            <Package size={16} color={isBankReorderMode ? "#3DD68C" : "#8F877E"} />
             <Text style={[styles.groupButtonText, isBankReorderMode && styles.reorderButtonTextActive]}>Reorder</Text>
           </TouchableOpacity>
 
@@ -192,7 +192,7 @@ export default function BankView() {
                   {showIcon && (
                     <IconComponent 
                       size={14} 
-                      color={activeBankTab === tab.id ? '#fff' : '#888'} 
+                      color={activeBankTab === tab.id ? '#fff' : '#8F877E'} 
                     />
                   )}
                   {showText && (
@@ -239,7 +239,7 @@ export default function BankView() {
                 }
               }}
               placeholder="Tab name"
-              placeholderTextColor="#666"
+              placeholderTextColor="#6F685F"
               autoFocus
               maxLength={20}
               returnKeyType="done"
@@ -250,7 +250,7 @@ export default function BankView() {
             style={styles.addTabButton}
             onPress={() => setIsCreatingTab(true)}
           >
-            <Plus size={16} color="#888" />
+            <Plus size={16} color="#8F877E" />
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -392,7 +392,7 @@ export default function BankView() {
                 setRenameModalIcon('');
                 setRenameModalDisplayMode('both');
               }}>
-                <X size={20} color="#888" />
+                <X size={20} color="#8F877E" />
               </TouchableOpacity>
             </View>
             
@@ -404,7 +404,7 @@ export default function BankView() {
               onChangeText={(text) => setRenameModalName(text.substring(0, 20))}
               maxLength={20}
               placeholder="Enter tab name"
-              placeholderTextColor="#666"
+              placeholderTextColor="#6F685F"
               returnKeyType="done"
             />
             
@@ -462,7 +462,7 @@ export default function BankView() {
                   onPress={() => setRenameModalIcon('')}
                 >
                   <View style={styles.iconSelectionIcon}>
-                    <X size={20} color="#888" />
+                    <X size={20} color="#8F877E" />
                   </View>
                 </TouchableOpacity>
                 
@@ -515,14 +515,14 @@ export default function BankView() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f0f23',
+    backgroundColor: '#0E0C11',
   },
   header: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#2a2a3e',
+    borderBottomColor: '#2C2733',
   },
   headerTop: {
     flexDirection: 'row',
@@ -534,7 +534,7 @@ const styles = StyleSheet.create({
   },
   bankSpaceLabel: {
     fontSize: 10,
-    color: '#888',
+    color: '#8F877E',
     letterSpacing: 0.5,
     marginBottom: 2,
   },
@@ -545,18 +545,18 @@ const styles = StyleSheet.create({
   },
   bankValueLabel: {
     fontSize: 10,
-    color: '#888',
+    color: '#8F877E',
     letterSpacing: 0.5,
     marginBottom: 2,
   },
   bankValue: {
     fontSize: 14,
-    color: '#fbbf24',
+    color: '#E0B252',
     fontWeight: 'bold' as const,
   },
   goldLabel: {
     fontSize: 10,
-    color: '#888',
+    color: '#8F877E',
     letterSpacing: 0.5,
     marginBottom: 2,
   },
@@ -567,14 +567,14 @@ const styles = StyleSheet.create({
   },
   goldValue: {
     fontSize: 14,
-    color: '#fbbf24',
+    color: '#E0B252',
     fontWeight: 'bold' as const,
   },
   tabsContainer: {
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     maxHeight: 60,
     borderBottomWidth: 1,
-    borderBottomColor: '#2a2a3e',
+    borderBottomColor: '#2C2733',
   },
   tabsContent: {
     flexDirection: 'row',
@@ -586,29 +586,29 @@ const styles = StyleSheet.create({
   tab: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
   activeTab: {
-    backgroundColor: '#2563eb',
-    borderColor: '#3b82f6',
+    backgroundColor: '#9B2830',
+    borderColor: '#B8323A',
   },
   tabText: {
     fontSize: 13,
-    color: '#888',
+    color: '#8F877E',
     fontWeight: '500' as const,
   },
   activeTabText: {
     color: '#fff',
   },
   swapSelectedTab: {
-    borderColor: '#10b981',
-    backgroundColor: 'rgba(16, 185, 129, 0.15)'
+    borderColor: '#3DD68C',
+    backgroundColor: 'rgba(61, 214, 140, 0.15)'
   },
   tabBadge: {
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -624,10 +624,10 @@ const styles = StyleSheet.create({
   addTabButton: {
     width: 32,
     height: 32,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
     borderStyle: 'dashed' as const,
     alignItems: 'center',
     justifyContent: 'center',
@@ -637,7 +637,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#3b82f6',
+    borderColor: '#B8323A',
     backgroundColor: 'transparent',
     paddingLeft: 4,
     maxWidth: 200,
@@ -664,12 +664,12 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject as any,
   },
   optionsCard: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
     borderTopWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
     paddingBottom: 30,
   },
   optionsTitle: {
@@ -680,12 +680,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   optionButton: {
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
     marginTop: 10,
   },
   optionButtonText: {
@@ -696,17 +696,17 @@ const styles = StyleSheet.create({
   },
   optionDestructive: {
     backgroundColor: 'rgba(220, 38, 38, 0.1)',
-    borderColor: '#dc2626',
+    borderColor: '#C9383D',
   },
   optionDestructiveText: {
-    color: '#ef4444',
+    color: '#E5484D',
   },
   optionCancel: {
     marginTop: 16,
     paddingVertical: 14,
   },
   optionCancelText: {
-    color: '#888',
+    color: '#8F877E',
     fontSize: 15,
     textAlign: 'center',
     fontWeight: '500' as const,
@@ -719,13 +719,13 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   renameModalContent: {
-    backgroundColor: '#0f0f23',
+    backgroundColor: '#0E0C11',
     borderRadius: 12,
     padding: 24,
     width: '85%',
     maxWidth: 320,
     borderWidth: 2,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
@@ -746,20 +746,20 @@ const styles = StyleSheet.create({
   },
   renameCloseButton: {
     padding: 8,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
   },
   renameInput: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 14,
     color: '#fff',
     fontSize: 16,
     borderWidth: 2,
-    borderColor: '#3b82f6',
+    borderColor: '#B8323A',
     marginBottom: 20,
     fontWeight: '500' as const,
   },
@@ -769,12 +769,12 @@ const styles = StyleSheet.create({
   },
   renameSaveButton: {
     flex: 1,
-    backgroundColor: '#2563eb',
+    backgroundColor: '#9B2830',
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#3b82f6',
+    borderColor: '#B8323A',
   },
   renameSaveButtonText: {
     color: '#fff',
@@ -784,12 +784,12 @@ const styles = StyleSheet.create({
   },
   renameCancelButton: {
     flex: 1,
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#E0B252',
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#fbbf24',
+    borderColor: '#E0B252',
   },
   renameCancelButtonText: {
     color: '#fff',
@@ -802,71 +802,71 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
     gap: 2,
   },
   groupButtonText: {
     fontSize: 10,
-    color: '#888',
+    color: '#8F877E',
     fontWeight: '500' as const,
   },
   moveModeIndicator: {
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     paddingVertical: 12,
     paddingHorizontal: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#2a2a3e',
+    borderBottomColor: '#2C2733',
   },
   moveModeText: {
-    color: '#10b981',
+    color: '#3DD68C',
     fontSize: 14,
     fontWeight: '500' as const,
   },
   moveModeCancel: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
   },
   moveModeCancelText: {
-    color: '#888',
+    color: '#8F877E',
     fontSize: 12,
     fontWeight: '500' as const,
   },
   reorderButtonActive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderColor: '#10b981',
+    backgroundColor: 'rgba(61, 214, 140, 0.15)',
+    borderColor: '#3DD68C',
   },
   reorderButtonTextActive: {
-    color: '#10b981',
+    color: '#3DD68C',
   },
   reorderModeIndicator: {
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     paddingVertical: 12,
     paddingHorizontal: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#2a2a3e',
+    borderBottomColor: '#2C2733',
   },
   reorderModeText: {
-    color: '#10b981',
+    color: '#3DD68C',
     fontSize: 14,
     fontWeight: '500' as const,
   },
   reorderModeCancel: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: '#10b981',
+    backgroundColor: '#3DD68C',
     borderRadius: 6,
   },
   reorderModeCancelText: {
@@ -875,14 +875,14 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
   },
   iconModalContent: {
-    backgroundColor: '#0f0f23',
+    backgroundColor: '#0E0C11',
     borderRadius: 12,
     padding: 24,
     width: '90%',
     maxWidth: 400,
     maxHeight: '70%',
     borderWidth: 2,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
@@ -903,10 +903,10 @@ const styles = StyleSheet.create({
   },
   iconCloseButton: {
     padding: 8,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
   },
   iconGrid: {
     maxHeight: 400,
@@ -922,37 +922,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
     padding: 10,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
   },
   iconOptionIcon: {
     width: 50,
     height: 50,
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
   },
   iconOptionText: {
     fontSize: 11,
-    color: '#888',
+    color: '#8F877E',
     fontWeight: '500' as const,
     textAlign: 'center',
   },
   customizeModalContent: {
-    backgroundColor: '#0f0f23',
+    backgroundColor: '#0E0C11',
     borderRadius: 12,
     padding: 24,
     width: '90%',
     maxWidth: 400,
     maxHeight: '80%',
     borderWidth: 2,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
@@ -961,7 +961,7 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontSize: 12,
-    color: '#888',
+    color: '#8F877E',
     fontWeight: '600' as const,
     marginTop: 16,
     marginBottom: 8,
@@ -977,19 +977,19 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
     alignItems: 'center',
   },
   displayModeActive: {
-    backgroundColor: '#2563eb',
-    borderColor: '#3b82f6',
+    backgroundColor: '#9B2830',
+    borderColor: '#B8323A',
   },
   displayModeText: {
     fontSize: 12,
-    color: '#888',
+    color: '#8F877E',
     fontWeight: '500' as const,
   },
   displayModeTextActive: {
@@ -1009,15 +1009,15 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
     padding: 8,
   },
   iconSelectionActive: {
-    backgroundColor: '#2563eb',
-    borderColor: '#3b82f6',
+    backgroundColor: '#9B2830',
+    borderColor: '#B8323A',
   },
   iconSelectionIcon: {
     width: 32,
@@ -1027,7 +1027,7 @@ const styles = StyleSheet.create({
   },
   iconSelectionText: {
     fontSize: 9,
-    color: '#888',
+    color: '#8F877E',
     fontWeight: '500' as const,
     marginTop: 4,
     textAlign: 'center',

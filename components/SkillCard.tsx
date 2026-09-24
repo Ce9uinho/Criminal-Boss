@@ -159,7 +159,8 @@ export default function SkillCard({ skill, onNavigateToStore, onNavigateToSmuggl
   // Action progress bar animation
   useEffect(() => {
     if (skill.isActive && skill.currentActivity) {
-      const actualTime = getActualTime(skill.id, skill.currentActivity.baseTime, skill.currentActivity.id);
+      // Same duration the store uses for the real timer (level, mastery, agent and tool bonuses).
+      const actualTime = useGameStore.getState().getAdjustedActionTime(skill.id, skill.currentActivity.baseTime, skill.currentActivity.id);
 
       const startAnimation = () => {
         actionProgressAnimation.setValue(0);
@@ -280,11 +281,7 @@ export default function SkillCard({ skill, onNavigateToStore, onNavigateToSmuggl
     if (skill.isActive && skill.currentActivity?.id === activity.id) {
       stopActivity(skill.id);
     } else {
-      // Check if player has required inputs
-      if (!hasRequiredInputs(bank, activity)) {
-        console.log('Missing required inputs for activity:', activity.name);
-        return;
-      }
+      // The store validates inputs (after tool reductions) and tells the player what's missing.
       startActivity(skill.id, activity);
     }
   };
@@ -325,7 +322,7 @@ export default function SkillCard({ skill, onNavigateToStore, onNavigateToSmuggl
           testID="thieving-tools-banner"
         >
           <View style={styles.toolsBannerLeft}>
-            <Wrench size={18} color="#9ca3af" />
+            <Wrench size={18} color="#A8A097" />
             <Text style={styles.toolsBannerTitle}>Heist Gear</Text>
           </View>
           <View style={styles.toolsBannerRight}>
@@ -349,7 +346,7 @@ export default function SkillCard({ skill, onNavigateToStore, onNavigateToSmuggl
           testID="drug-tools-banner"
         >
           <View style={styles.toolsBannerLeft}>
-            <Wrench size={18} color="#9ca3af" />
+            <Wrench size={18} color="#A8A097" />
             <Text style={styles.toolsBannerTitle}>Facilities</Text>
           </View>
         </TouchableOpacity>
@@ -363,7 +360,7 @@ export default function SkillCard({ skill, onNavigateToStore, onNavigateToSmuggl
           testID="distillery-tools-banner"
         >
           <View style={styles.toolsBannerLeft}>
-            <Wrench size={18} color="#9ca3af" />
+            <Wrench size={18} color="#A8A097" />
             <Text style={styles.toolsBannerTitle}>Equipment</Text>
           </View>
         </TouchableOpacity>
@@ -377,7 +374,7 @@ export default function SkillCard({ skill, onNavigateToStore, onNavigateToSmuggl
           testID="investigation-lab-tools-banner"
         >
           <View style={styles.toolsBannerLeft}>
-            <Wrench size={18} color="#9ca3af" />
+            <Wrench size={18} color="#A8A097" />
             <Text style={styles.toolsBannerTitle}>Lab Sets</Text>
           </View>
         </TouchableOpacity>
@@ -474,7 +471,7 @@ export default function SkillCard({ skill, onNavigateToStore, onNavigateToSmuggl
                       style={styles.iconButton}
                       onPress={() => setShowDropsFor(activity)}
                     >
-                      <Package size={16} color="#94a3b8" />
+                      <Package size={16} color="#A8A097" />
                       <Text style={styles.iconButtonText}>Drops</Text>
                     </TouchableOpacity>
                   )}
@@ -682,7 +679,7 @@ export default function SkillCard({ skill, onNavigateToStore, onNavigateToSmuggl
                     })}
                   >
                     <View style={styles.masteryHeader}>
-                      <Trophy size={14} color="#fbbf24" />
+                      <Trophy size={14} color="#E0B252" />
                       <Text style={styles.masteryLabel}>Mastery</Text>
                       <Text style={styles.masteryPercent}>{masteryPercent.toFixed(1)}%</Text>
                     </View>
@@ -754,7 +751,7 @@ export default function SkillCard({ skill, onNavigateToStore, onNavigateToSmuggl
                     })}
                   >
                     <View style={styles.masteryHeader}>
-                      <Trophy size={14} color="#fbbf24" />
+                      <Trophy size={14} color="#E0B252" />
                       <Text style={styles.masteryLabel}>Mastery</Text>
                       <Text style={styles.masteryPercent}>{masteryPercent.toFixed(1)}%</Text>
                     </View>
@@ -841,19 +838,19 @@ export default function SkillCard({ skill, onNavigateToStore, onNavigateToSmuggl
               {/* Level Lock Warning */}
               {isLocked && (
                 <View style={styles.lockedOverlay}>
-                  <Text style={styles.lockedOverlayText}>🔒 Level {activity.levelRequired} Required</Text>
+                  <Text style={styles.lockedOverlayText}>🔒 Unlocks at Lv {activity.levelRequired}</Text>
                 </View>
               )}
               
               {/* Cooldown Overlay for Thieving */}
               {skill.id === 'thieving' && currentCooldown > 0 && (
                 <View style={styles.cooldownOverlay}>
-                  <Text style={styles.cooldownOverlayTitle}>⚠️ You got caught!</Text>
+                  <Text style={styles.cooldownOverlayTitle}>🚨 Busted</Text>
                   <View style={styles.cooldownTimerContainer}>
                     <Text style={styles.cooldownTimerValue}>{currentCooldown}</Text>
                     <Text style={styles.cooldownTimerLabel}>seconds</Text>
                   </View>
-                  <Text style={styles.cooldownOverlaySubtext}>Wait for cooldown...</Text>
+                  <Text style={styles.cooldownOverlaySubtext}>Lying low. Resumes automatically.</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -1021,7 +1018,7 @@ export default function SkillCard({ skill, onNavigateToStore, onNavigateToSmuggl
                 onPress={(e) => e.stopPropagation()}
               >
                 <View style={styles.quickShopHeader}>
-                  <ShoppingCart size={20} color="#4ade80" />
+                  <ShoppingCart size={20} color="#E0B252" />
                   <Text style={styles.quickShopTitle}>Quick Shop</Text>
                   <TouchableOpacity
                     style={styles.quickShopCloseButton}
@@ -1124,7 +1121,7 @@ export default function SkillCard({ skill, onNavigateToStore, onNavigateToSmuggl
                     }}
                     disabled={!canAfford}
                   >
-                    <ShoppingCart size={18} color={canAfford ? '#000' : '#666'} />
+                    <ShoppingCart size={18} color={canAfford ? '#000' : '#6F685F'} />
                     <Text style={[
                       styles.quickShopBuyButtonText,
                       !canAfford && styles.quickShopBuyButtonTextDisabled
@@ -1195,13 +1192,13 @@ export default function SkillCard({ skill, onNavigateToStore, onNavigateToSmuggl
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#16213e',
-    shadowColor: '#4ade80',
+    borderColor: '#1D1922',
+    shadowColor: '#E0B252',
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 8,
   },
@@ -1227,7 +1224,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#2a2a3e',
+    borderBottomColor: '#2C2733',
   },
   skillIcon: {
     fontSize: 32,
@@ -1238,7 +1235,7 @@ const styles = StyleSheet.create({
   },
   level: {
     fontSize: 14,
-    color: '#0f3460',
+    color: '#2A2531',
     fontWeight: '600',
   },
   xpSection: {
@@ -1254,21 +1251,21 @@ const styles = StyleSheet.create({
   xp: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#ffd700',
+    color: '#E0B252',
   },
   xpToNext: {
     fontSize: 11,
-    color: '#888',
+    color: '#8F877E',
   },
   headerProgressBar: {
     height: 6,
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     borderRadius: 3,
     overflow: 'hidden',
   },
   headerProgressFill: {
     height: '100%',
-    backgroundColor: '#ffd700',
+    backgroundColor: '#E0B252',
     borderRadius: 3,
   },
   progressContainer: {
@@ -1279,18 +1276,18 @@ const styles = StyleSheet.create({
   progressBar: {
     flex: 1,
     height: 8,
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     borderRadius: 4,
     marginRight: 8,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#0f3460',
+    backgroundColor: '#2A2531',
     borderRadius: 4,
   },
   progressText: {
     fontSize: 12,
-    color: '#888',
+    color: '#8F877E',
     minWidth: 40,
     textAlign: 'right',
   },
@@ -1299,9 +1296,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#0e1422',
+    backgroundColor: '#121016',
     borderWidth: 1,
-    borderColor: '#223046',
+    borderColor: '#2C2733',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -1313,7 +1310,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   toolsBannerTitle: {
-    color: '#e5e7eb',
+    color: '#E8E1D6',
     fontWeight: '800',
     fontSize: 16,
   },
@@ -1326,12 +1323,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   toolsTierText: {
-    color: '#4ade80',
+    color: '#E0B252',
     fontWeight: '900',
     fontSize: 14,
   },
   toolsHint: {
-    color: '#94a3b8',
+    color: '#A8A097',
     fontSize: 12,
   },
   activePill: {
@@ -1345,7 +1342,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(34,197,94,0.24)'
   },
   activeIcon: { fontSize: 14, marginRight: 6 },
-  activeText: { color: '#4ade80', fontSize: 12, fontWeight: '700' },
+  activeText: { color: '#E0B252', fontSize: 12, fontWeight: '700' },
 
   activitiesGrid: {
     flexDirection: 'row',
@@ -1358,33 +1355,33 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   activityCardInner: {
-    backgroundColor: '#16213e',
-    borderRadius: 8,
+    backgroundColor: '#18151D',
+    borderRadius: 12,
     padding: 8,
     borderWidth: 2,
-    borderColor: '#0f3460',
+    borderColor: '#2A2531',
     height: 250,
     justifyContent: 'space-between',
     overflow: 'hidden',
   },
   activeActivityCard: {
-    backgroundColor: '#0f3460',
-    borderColor: '#ffd700',
+    backgroundColor: '#2A2531',
+    borderColor: '#E0B252',
     borderWidth: 2,
-    shadowColor: '#ffd700',
+    shadowColor: '#E0B252',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
     shadowRadius: 6,
     elevation: 6,
   },
   disabledActivityCard: {
-    backgroundColor: '#0a0a0a',
-    borderColor: '#333',
+    backgroundColor: '#0B0A0D',
+    borderColor: '#3E3648',
     opacity: 0.6,
   },
   missingInputsActivityCard: {
-    borderColor: '#ff6b6b',
-    backgroundColor: 'rgba(255, 107, 107, 0.05)',
+    borderColor: '#E5484D',
+    backgroundColor: 'rgba(229, 72, 77, 0.05)',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -1402,7 +1399,7 @@ const styles = StyleSheet.create({
   levelIndicator: {
     fontSize: 9,
     fontWeight: 'bold',
-    color: '#fbbf24',
+    color: '#E0B252',
     backgroundColor: 'rgba(251, 191, 36, 0.15)',
     paddingHorizontal: 4,
     paddingVertical: 1,
@@ -1421,10 +1418,10 @@ const styles = StyleSheet.create({
   cardStatus: {
     fontSize: 8,
     fontWeight: 'bold',
-    color: '#0f3460',
+    color: '#2A2531',
     paddingHorizontal: 4,
     paddingVertical: 1,
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     borderRadius: 3,
     flexShrink: 1,
     textAlign: 'center',
@@ -1435,40 +1432,39 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    backgroundColor: '#0f1b2d',
+    backgroundColor: '#16131A',
     borderWidth: 1,
-    borderColor: '#233046',
+    borderColor: '#2C2733',
     borderRadius: 8,
     marginRight: 6,
   },
   iconButtonText: {
-    color: '#94a3b8',
+    color: '#A8A097',
     fontSize: 12,
     fontWeight: '600',
   },
   activeCardStatus: {
-    color: '#ffd700',
-    backgroundColor: '#1a1a2e',
+    color: '#E0B252',
+    backgroundColor: '#18151D',
   },
   disabledCardStatus: {
-    color: '#666',
-    backgroundColor: '#0a0a0a',
+    color: '#6F685F',
+    backgroundColor: '#0B0A0D',
   },
   lockedActivityCard: {
-    backgroundColor: '#0a0a0a',
-    borderColor: '#ef4444',
-    opacity: 0.7,
+    backgroundColor: '#0E0C11',
+    borderColor: '#2C2733',
+    borderStyle: 'dashed',
   },
   lockedCardStatus: {
-    color: '#ef4444',
-    backgroundColor: '#1a1a2e',
+    color: '#A8A097',
+    backgroundColor: '#18151D',
   },
   lockedIcon: {
     opacity: 0.5,
   },
   lockedText: {
-    color: '#ef4444',
-    opacity: 0.7,
+    color: '#6F685F',
   },
   lockedOverlay: {
     position: 'absolute',
@@ -1476,16 +1472,24 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(11, 10, 13, 0.82)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: 8,
   },
   lockedOverlayText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#ef4444',
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#A8A097',
     textAlign: 'center',
+    letterSpacing: 0.3,
+    backgroundColor: '#18151D',
+    borderWidth: 1,
+    borderColor: '#3E3648',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    overflow: 'hidden',
   },
   productDisplay: {
     alignItems: 'center',
@@ -1497,7 +1501,7 @@ const styles = StyleSheet.create({
   },
   productName: {
     fontSize: 10,
-    color: '#4ade80',
+    color: '#E0B252',
     fontWeight: '600',
   },
   statsRow: {
@@ -1510,7 +1514,7 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 8,
-    color: '#888',
+    color: '#8F877E',
     marginBottom: 1,
   },
   statValue: {
@@ -1519,10 +1523,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   xpValue: {
-    color: '#4ade80',
+    color: '#E0B252',
   },
   masteryValue: {
-    color: '#fbbf24',
+    color: '#E0B252',
   },
   masteryInfoButton: {
     flexDirection: 'row',
@@ -1538,7 +1542,7 @@ const styles = StyleSheet.create({
   },
   masteryInfoText: {
     fontSize: 10,
-    color: '#fbbf24',
+    color: '#E0B252',
     fontWeight: '600'
   },
   masteryStatContainer: {
@@ -1546,29 +1550,29 @@ const styles = StyleSheet.create({
   },
   cardProgressContainer: {
     height: 3,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#0B0A0D',
     borderRadius: 2,
     overflow: 'hidden',
     marginVertical: 6,
   },
   cardProgressFill: {
     height: '100%',
-    backgroundColor: '#4ade80',
+    backgroundColor: '#E0B252',
   },
   inputsSection: {
-    backgroundColor: 'rgba(15, 52, 96, 0.2)',
+    backgroundColor: 'rgba(42, 37, 49, 0.2)',
     padding: 6,
     borderRadius: 6,
     marginTop: 4,
   },
   inputsSectionMissing: {
-    backgroundColor: 'rgba(255, 107, 107, 0.15)',
+    backgroundColor: 'rgba(229, 72, 77, 0.15)',
     borderWidth: 1,
-    borderColor: '#ff6b6b',
+    borderColor: '#E5484D',
   },
   inputsTitle: {
     fontSize: 9,
-    color: '#aaa',
+    color: '#A8A097',
     fontWeight: 'bold',
     marginBottom: 4,
     textAlign: 'center',
@@ -1583,19 +1587,19 @@ const styles = StyleSheet.create({
   inputChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     paddingHorizontal: 4,
     paddingVertical: 1,
     borderRadius: 3,
     borderWidth: 1,
-    borderColor: '#0f3460',
+    borderColor: '#2A2531',
     maxWidth: '48%',
     minWidth: 40,
     flexShrink: 1,
   },
   inputChipMissing: {
-    backgroundColor: 'rgba(255, 107, 107, 0.15)',
-    borderColor: '#ff6b6b',
+    backgroundColor: 'rgba(229, 72, 77, 0.15)',
+    borderColor: '#E5484D',
   },
   inputChipIcon: {
     fontSize: 10,
@@ -1608,19 +1612,19 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   inputChipTextMissing: {
-    color: '#ff6b6b',
+    color: '#E5484D',
   },
   warningButton: {
     marginTop: 6,
     padding: 4,
-    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    backgroundColor: 'rgba(229, 72, 77, 0.1)',
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#ff6b6b',
+    borderColor: '#E5484D',
   },
   warningButtonText: {
     fontSize: 9,
-    color: '#ff6b6b',
+    color: '#E5484D',
     textAlign: 'center',
     fontWeight: '600',
   },
@@ -1631,15 +1635,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#0f3460',
+    borderColor: '#2A2531',
   },
   activeActivity: {
-    backgroundColor: '#0f3460',
-    borderColor: '#ffd700',
+    backgroundColor: '#2A2531',
+    borderColor: '#E0B252',
   },
   activityInfo: {
     flexDirection: 'row',
@@ -1665,21 +1669,21 @@ const styles = StyleSheet.create({
   },
   activityDetails: {
     fontSize: 12,
-    color: '#888',
+    color: '#8F877E',
     fontWeight: '500',
   },
   activityStatus: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#0f3460',
+    color: '#2A2531',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     borderRadius: 4,
   },
   activeStatus: {
-    color: '#ffd700',
-    backgroundColor: '#1a1a2e',
+    color: '#E0B252',
+    backgroundColor: '#18151D',
   },
   floatingXp: {
     position: 'absolute',
@@ -1690,7 +1694,7 @@ const styles = StyleSheet.create({
   floatingXpText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#00ff88',
+    color: '#3DD68C',
     textShadowColor: '#000',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
@@ -1707,7 +1711,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 20,
     borderWidth: 2,
-    borderColor: '#ffd700',
+    borderColor: '#E0B252',
   },
   levelUpText: {
     fontSize: 16,
@@ -1724,36 +1728,36 @@ const styles = StyleSheet.create({
     // Wrapper for activity button animations
   },
   disabledActivity: {
-    backgroundColor: '#0a0a0a',
-    borderColor: '#333',
+    backgroundColor: '#0B0A0D',
+    borderColor: '#3E3648',
     opacity: 0.6,
   },
   disabledText: {
     color: '#555',
   },
   disabledStatus: {
-    color: '#666',
-    backgroundColor: '#0a0a0a',
+    color: '#6F685F',
+    backgroundColor: '#0B0A0D',
   },
   failureChance: {
-    color: '#ff6b6b',
+    color: '#E5484D',
   },
   inputsContainer: {
     marginTop: 8,
-    backgroundColor: 'rgba(15, 52, 96, 0.2)',
+    backgroundColor: 'rgba(42, 37, 49, 0.2)',
     padding: 8,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#0f3460',
+    borderColor: '#2A2531',
   },
   inputsContainerMissing: {
-    backgroundColor: 'rgba(255, 107, 107, 0.15)',
-    borderColor: '#ff6b6b',
+    backgroundColor: 'rgba(229, 72, 77, 0.15)',
+    borderColor: '#E5484D',
     borderWidth: 2,
   },
   inputsLabel: {
     fontSize: 11,
-    color: '#aaa',
+    color: '#A8A097',
     marginBottom: 6,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -1767,16 +1771,16 @@ const styles = StyleSheet.create({
   inputItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#0f3460',
+    borderColor: '#2A2531',
   },
   inputItemMissing: {
-    backgroundColor: 'rgba(255, 107, 107, 0.15)',
-    borderColor: '#ff6b6b',
+    backgroundColor: 'rgba(229, 72, 77, 0.15)',
+    borderColor: '#E5484D',
     borderWidth: 2,
   },
   inputIcon: {
@@ -1789,20 +1793,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   missingInput: {
-    color: '#ff6b6b',
+    color: '#E5484D',
     fontWeight: 'bold',
   },
   missingInputsContainer: {
     marginTop: 8,
     padding: 8,
-    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    backgroundColor: 'rgba(229, 72, 77, 0.1)',
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#ff6b6b',
+    borderColor: '#E5484D',
   },
   missingInputsText: {
     fontSize: 11,
-    color: '#ff6b6b',
+    color: '#E5484D',
     textAlign: 'center',
     fontWeight: '600',
   },
@@ -1811,7 +1815,7 @@ const styles = StyleSheet.create({
   },
   sourcesLabel: {
     fontSize: 9,
-    color: '#aaa',
+    color: '#A8A097',
     marginBottom: 4,
     fontWeight: 'bold',
   },
@@ -1829,7 +1833,7 @@ const styles = StyleSheet.create({
   },
   sourceName: {
     fontSize: 9,
-    color: '#ccc',
+    color: '#D4CCC1',
     fontWeight: 'bold',
   },
   sourceOptions: {
@@ -1840,16 +1844,16 @@ const styles = StyleSheet.create({
   },
   sourceOption: {
     fontSize: 8,
-    color: '#888',
-    backgroundColor: '#0a0a0a',
+    color: '#8F877E',
+    backgroundColor: '#0B0A0D',
     paddingHorizontal: 4,
     paddingVertical: 1,
     borderRadius: 2,
   },
   missingInputsActivity: {
-    borderColor: '#ff6b6b',
+    borderColor: '#E5484D',
     borderWidth: 2,
-    backgroundColor: 'rgba(255, 107, 107, 0.05)',
+    backgroundColor: 'rgba(229, 72, 77, 0.05)',
   },
   modalOverlay: {
     flex: 1,
@@ -1859,12 +1863,12 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalContainer: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderRadius: 12,
     width: '100%',
     maxHeight: '80%',
     borderWidth: 1,
-    borderColor: '#16213e',
+    borderColor: '#1D1922',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1872,7 +1876,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#16213e',
+    borderBottomColor: '#1D1922',
   },
   modalTitle: {
     fontSize: 18,
@@ -1893,12 +1897,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   modalInputItem: {
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#0f3460',
+    borderColor: '#2A2531',
   },
   modalInputHeader: {
     flexDirection: 'row',
@@ -1920,29 +1924,29 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   modalInputSufficient: {
-    color: '#00ff88',
+    color: '#3DD68C',
   },
   modalInputInsufficient: {
-    color: '#ff6b6b',
+    color: '#E5484D',
   },
   modalSourcesContainer: {
     marginTop: 8,
   },
   modalSourcesLabel: {
     fontSize: 12,
-    color: '#aaa',
+    color: '#A8A097',
     marginBottom: 6,
     fontWeight: 'bold',
   },
   modalSourceItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0f3460',
+    backgroundColor: '#2A2531',
     padding: 8,
     borderRadius: 6,
     marginBottom: 4,
     borderWidth: 1,
-    borderColor: '#16213e',
+    borderColor: '#1D1922',
   },
   modalSourceIcon: {
     fontSize: 16,
@@ -1950,11 +1954,11 @@ const styles = StyleSheet.create({
   },
   modalSourceText: {
     fontSize: 12,
-    color: '#ccc',
+    color: '#D4CCC1',
     flex: 1,
   },
   productText: {
-    color: '#4ade80',
+    color: '#E0B252',
     fontWeight: '600',
   },
   modalStoreContainer: {
@@ -1968,14 +1972,14 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   quickShopContainer: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
     borderWidth: 2,
-    borderTopColor: '#4ade80',
-    borderLeftColor: '#4ade80',
-    borderRightColor: '#4ade80',
+    borderTopColor: '#E0B252',
+    borderLeftColor: '#E0B252',
+    borderRightColor: '#E0B252',
     maxHeight: '70%',
   },
   quickShopHeader: {
@@ -2001,11 +2005,11 @@ const styles = StyleSheet.create({
   quickShopItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#0f3460',
+    borderColor: '#2A2531',
   },
   quickShopItemIcon: {
     fontSize: 32,
@@ -2022,18 +2026,18 @@ const styles = StyleSheet.create({
   },
   quickShopItemPrice: {
     fontSize: 14,
-    color: '#4ade80',
+    color: '#E0B252',
     fontWeight: '600',
   },
   quickShopQuantitySection: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#0f3460',
+    borderColor: '#2A2531',
   },
   quickShopQuantityLabel: {
     fontSize: 16,
@@ -2048,12 +2052,12 @@ const styles = StyleSheet.create({
   quickShopQuantityButton: {
     width: 36,
     height: 36,
-    backgroundColor: '#0f3460',
+    backgroundColor: '#2A2531',
     borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#4ade80',
+    borderColor: '#E0B252',
   },
   quickShopQuantityText: {
     fontSize: 20,
@@ -2068,17 +2072,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: '#2a2a3e',
+    borderTopColor: '#2C2733',
   },
   quickShopTotalLabel: {
     fontSize: 16,
-    color: '#888',
+    color: '#8F877E',
     fontWeight: '600',
   },
   quickShopTotalPrice: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#4ade80',
+    color: '#E0B252',
   },
   quickShopBalance: {
     flexDirection: 'row',
@@ -2088,15 +2092,15 @@ const styles = StyleSheet.create({
   },
   quickShopBalanceLabel: {
     fontSize: 14,
-    color: '#888',
+    color: '#8F877E',
   },
   quickShopBalanceAmount: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#ffd700',
+    color: '#E0B252',
   },
   quickShopInsufficientFunds: {
-    color: '#ff6b6b',
+    color: '#E5484D',
   },
   quickShopQuickButtons: {
     flexDirection: 'row',
@@ -2105,15 +2109,15 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   quickShopQuickButton: {
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#4ade80',
+    borderColor: '#E0B252',
   },
   quickShopQuickButtonText: {
-    color: '#4ade80',
+    color: '#E0B252',
     fontSize: 12,
     fontWeight: 'bold',
   },
@@ -2121,14 +2125,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4ade80',
+    backgroundColor: '#E0B252',
     paddingVertical: 14,
     borderRadius: 12,
     marginTop: 12,
     gap: 8,
   },
   quickShopBuyButtonDisabled: {
-    backgroundColor: '#2a2a3e',
+    backgroundColor: '#2C2733',
     opacity: 0.6,
   },
   quickShopBuyButtonText: {
@@ -2137,10 +2141,10 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   quickShopBuyButtonTextDisabled: {
-    color: '#666',
+    color: '#6F685F',
   },
   quickShopQuantityInput: {
-    backgroundColor: '#0f1419',
+    backgroundColor: '#121016',
     color: '#fff',
     textAlign: 'center',
     fontSize: 18,
@@ -2149,18 +2153,18 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#4ade80',
+    borderColor: '#E0B252',
     paddingHorizontal: 4,
   },
 
   // Heat styles
   heatContainer: {
-    backgroundColor: 'rgba(255, 107, 107, 0.05)',
+    backgroundColor: 'rgba(229, 72, 77, 0.05)',
     borderRadius: 8,
     padding: 10,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 107, 0.2)',
+    borderColor: 'rgba(229, 72, 77, 0.2)',
   },
   heatHeader: {
     flexDirection: 'row',
@@ -2171,23 +2175,23 @@ const styles = StyleSheet.create({
   heatLabel: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#ff6b6b',
+    color: '#E5484D',
   },
   heatValue: {
     fontSize: 16,
     fontWeight: 'bold',
   },
   heatLow: {
-    color: '#4ade80',
+    color: '#E0B252',
   },
   heatMedium: {
-    color: '#fbbf24',
+    color: '#E0B252',
   },
   heatHigh: {
     color: '#fb923c',
   },
   heatCritical: {
-    color: '#ef4444',
+    color: '#E5484D',
   },
   heatBar: {
     height: 6,
@@ -2201,27 +2205,27 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   heatFillLow: {
-    backgroundColor: '#4ade80',
+    backgroundColor: '#E0B252',
   },
   heatFillMedium: {
-    backgroundColor: '#fbbf24',
+    backgroundColor: '#E0B252',
   },
   heatFillHigh: {
     backgroundColor: '#fb923c',
   },
   heatFillCritical: {
-    backgroundColor: '#ef4444',
+    backgroundColor: '#E5484D',
   },
   heatDescription: {
     fontSize: 11,
-    color: '#aaa',
+    color: '#A8A097',
     fontStyle: 'italic',
   },
   heatStatPositive: {
-    color: '#ff6b6b',
+    color: '#E5484D',
   },
   heatStatNegative: {
-    color: '#4ade80',
+    color: '#E0B252',
   },
   
   // Mastery styles for thieving
@@ -2242,13 +2246,13 @@ const styles = StyleSheet.create({
   masteryLabel: {
     fontSize: 8,
     fontWeight: 'bold',
-    color: '#fbbf24',
+    color: '#E0B252',
     flex: 1,
   },
   masteryPercent: {
     fontSize: 8,
     fontWeight: 'bold',
-    color: '#fbbf24',
+    color: '#E0B252',
   },
   masteryBar: {
     height: 4,
@@ -2258,12 +2262,12 @@ const styles = StyleSheet.create({
   },
   masteryFill: {
     height: '100%',
-    backgroundColor: '#fbbf24',
+    backgroundColor: '#E0B252',
     borderRadius: 2,
   },
   masteryPerkText: {
     fontSize: 7,
-    color: '#4ade80',
+    color: '#E0B252',
     marginTop: 2,
     fontWeight: '600',
   },
@@ -2271,8 +2275,8 @@ const styles = StyleSheet.create({
   agentBanner: {
     flexDirection: 'row',
     gap: 10,
-    backgroundColor: 'rgba(59, 130, 246, 0.12)',
-    borderColor: 'rgba(59, 130, 246, 0.4)',
+    backgroundColor: 'rgba(184, 50, 58, 0.12)',
+    borderColor: 'rgba(184, 50, 58, 0.4)',
     borderWidth: 1,
     borderRadius: 10,
     padding: 10,
@@ -2284,7 +2288,7 @@ const styles = StyleSheet.create({
   },
   agentTitle: {
     fontSize: 10,
-    color: '#60a5fa',
+    color: '#E0B252',
     fontWeight: '800',
     letterSpacing: 0.5,
   },
@@ -2295,7 +2299,7 @@ const styles = StyleSheet.create({
   },
   agentDesc: {
     fontSize: 10,
-    color: '#cbd5e1',
+    color: '#E8E1D6',
     marginTop: 2,
   },
   agentBonusesRow: {
@@ -2304,19 +2308,19 @@ const styles = StyleSheet.create({
   },
   agentBonusChip: {
     fontSize: 10,
-    color: '#bfdbfe',
+    color: '#F6E7C1',
   },
   
   // Thieving specific stats
   thievingStatsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: 'rgba(255, 107, 107, 0.05)',
+    backgroundColor: 'rgba(229, 72, 77, 0.05)',
     borderRadius: 4,
     padding: 4,
     marginTop: 4,
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 107, 0.2)',
+    borderColor: 'rgba(229, 72, 77, 0.2)',
   },
   thievingStatItem: {
     alignItems: 'center',
@@ -2324,7 +2328,7 @@ const styles = StyleSheet.create({
   },
   thievingStatLabel: {
     fontSize: 8,
-    color: '#aaa',
+    color: '#A8A097',
     marginBottom: 1,
     fontWeight: '600',
   },
@@ -2333,19 +2337,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   catchRateLow: {
-    color: '#4ade80',
+    color: '#E0B252',
   },
   catchRateMedium: {
-    color: '#fbbf24',
+    color: '#E0B252',
   },
   catchRateHigh: {
-    color: '#ef4444',
+    color: '#E5484D',
   },
   cooldownInactive: {
-    color: '#888',
+    color: '#8F877E',
   },
   cooldownActive: {
-    color: '#ef4444',
+    color: '#E5484D',
   },
   cooldownWarning: {
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
@@ -2357,7 +2361,7 @@ const styles = StyleSheet.create({
   },
   cooldownWarningText: {
     fontSize: 10,
-    color: '#ef4444',
+    color: '#E5484D',
     textAlign: 'center',
     fontWeight: '600',
   },
@@ -2369,62 +2373,63 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(239, 68, 68, 0.95)',
+    backgroundColor: 'rgba(14, 12, 17, 0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(229, 72, 77, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 12,
     zIndex: 100,
   },
   cooldownOverlayTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#E5484D',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 6,
   },
   cooldownTimerContainer: {
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   cooldownTimerValue: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    fontSize: 34,
+    fontWeight: '900',
+    color: '#F4EFE6',
   },
   cooldownTimerLabel: {
-    fontSize: 12,
-    color: '#fff',
-    opacity: 0.9,
+    fontSize: 11,
+    color: '#A8A097',
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
     marginTop: 2,
   },
   cooldownOverlaySubtext: {
     fontSize: 11,
-    color: '#fff',
-    opacity: 0.8,
+    color: '#8F877E',
     fontStyle: 'italic',
+    textAlign: 'center',
+    paddingHorizontal: 8,
   },
 
   // Manager UI styles
   containerWithManager: {
-    borderColor: '#3b82f6',
+    borderColor: '#B8323A',
     borderWidth: 2,
-    shadowColor: '#3b82f6',
+    shadowColor: '#B8323A',
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
   },
   managerHeader: {
-    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+    backgroundColor: 'rgba(184, 50, 58, 0.08)',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 2,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
+    borderColor: 'rgba(184, 50, 58, 0.3)',
     position: 'relative',
     overflow: 'hidden',
   },
@@ -2448,7 +2453,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    backgroundColor: 'rgba(184, 50, 58, 0.2)',
     zIndex: 1,
   },
   managerInfo: {
@@ -2458,7 +2463,7 @@ const styles = StyleSheet.create({
   managerTitle: {
     fontSize: 10,
     fontWeight: '900',
-    color: '#60a5fa',
+    color: '#E0B252',
     letterSpacing: 1,
     marginBottom: 2,
   },
@@ -2470,22 +2475,22 @@ const styles = StyleSheet.create({
   },
   managerDescription: {
     fontSize: 11,
-    color: '#cbd5e1',
+    color: '#E8E1D6',
     lineHeight: 14,
     fontStyle: 'italic',
   },
   managerBadge: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    backgroundColor: 'rgba(184, 50, 58, 0.2)',
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.4)',
+    borderColor: 'rgba(184, 50, 58, 0.4)',
   },
   managerBadgeText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#60a5fa',
+    color: '#E0B252',
     letterSpacing: 0.5,
   },
   managerBonuses: {
@@ -2494,7 +2499,7 @@ const styles = StyleSheet.create({
   managerBonusesTitle: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#94a3b8',
+    color: '#A8A097',
     marginBottom: 8,
     letterSpacing: 0.5,
   },
@@ -2504,17 +2509,17 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   managerBonusChip: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    backgroundColor: 'rgba(184, 50, 58, 0.15)',
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
+    borderColor: 'rgba(184, 50, 58, 0.3)',
   },
   managerBonusText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#bfdbfe',
+    color: '#F6E7C1',
   },
 
 });

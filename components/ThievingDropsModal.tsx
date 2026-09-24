@@ -43,11 +43,11 @@ export default function ThievingDropsModal({ visible, onClose, activity }: Thiev
         <View style={styles.modal}>
           <View style={styles.header}>
             <View style={styles.titleRow}>
-              <List size={16} color="#4ade80" />
+              <List size={16} color="#E0B252" />
               <Text style={styles.title} numberOfLines={1}>Drops & Odds</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn} testID="drops-close">
-              <X size={18} color="#bbb" />
+              <X size={18} color="#BDB5AA" />
             </TouchableOpacity>
           </View>
 
@@ -93,10 +93,10 @@ const styles = StyleSheet.create({
   modal: {
     width: '100%',
     maxWidth: 420,
-    backgroundColor: '#0f0f1a',
+    backgroundColor: '#0E0C11',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#223',
+    borderColor: '#2C2733',
     padding: 14,
   },
   header: {
@@ -117,12 +117,12 @@ const styles = StyleSheet.create({
   },
   closeBtn: { padding: 6 },
   activityName: {
-    color: '#94a3b8',
+    color: '#A8A097',
     fontSize: 12,
     marginBottom: 8,
   },
   helper: {
-    color: '#9ca3af',
+    color: '#A8A097',
     fontSize: 11,
     marginBottom: 8,
     fontStyle: 'italic',
@@ -134,9 +134,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#151826',
+    backgroundColor: '#18151D',
     borderWidth: 1,
-    borderColor: '#233',
+    borderColor: '#2C2733',
     borderRadius: 10,
     padding: 10,
     marginBottom: 8,
@@ -144,10 +144,10 @@ const styles = StyleSheet.create({
   left: { flexDirection: 'row', alignItems: 'center' },
   icon: { fontSize: 20, marginRight: 10 },
   meta: { },
-  name: { color: '#e5e7eb', fontWeight: '600', fontSize: 13 },
-  qty: { color: '#9ca3af', fontSize: 11, marginTop: 2 },
+  name: { color: '#E8E1D6', fontWeight: '600', fontSize: 13 },
+  qty: { color: '#A8A097', fontSize: 11, marginTop: 2 },
   right: { },
-  prob: { color: '#4ade80', fontWeight: '800', fontSize: 14 },
+  prob: { color: '#E0B252', fontWeight: '800', fontSize: 14 },
   empty: { paddingVertical: 24, alignItems: 'center' },
-  emptyText: { color: '#aaa' },
+  emptyText: { color: '#A8A097' },
 });

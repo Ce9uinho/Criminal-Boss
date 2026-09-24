@@ -247,7 +247,7 @@ const SellModal: React.FC<{
                 onChangeText={handleInputChange}
                 keyboardType="number-pad"
                 placeholder="0"
-                placeholderTextColor="#6b7280"
+                placeholderTextColor="#7A7269"
                 maxLength={10}
                 selectTextOnFocus
                 returnKeyType="done"
@@ -266,8 +266,8 @@ const SellModal: React.FC<{
         </View>
 
         <View style={styles.priceInfo}>
-          <Text style={styles.priceText}>Price per item: {formatCash(sellPrice)} gp</Text>
-          <Text style={styles.totalText}>Total: {formatCash(totalValue)} gp</Text>
+          <Text style={styles.priceText}>Price per item: ${formatCash(sellPrice)}</Text>
+          <Text style={styles.totalText}>Total: ${formatCash(totalValue)}</Text>
         </View>
 
         <View style={styles.quickButtons}>
@@ -303,7 +303,7 @@ const SellModal: React.FC<{
 
         {item?.resourceId === 'loot_bag' && (
           <TouchableOpacity
-            style={[styles.modalButton, { backgroundColor: 'rgba(251, 191, 36, 0.15)', borderColor: '#fbbf24', marginBottom: 12 }]}
+            style={[styles.modalButton, { backgroundColor: 'rgba(251, 191, 36, 0.15)', borderColor: '#E0B252', marginBottom: 12 }]}
             onPress={() => setShowDrops(true)}
             testID="view-drops-button"
           >
@@ -350,7 +350,7 @@ const SellModal: React.FC<{
           {item?.resourceId === 'loot_bag' && (
             <>
               <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: '#10b981' }]}
+                style={[styles.modalButton, { backgroundColor: 'rgba(61, 214, 140, 0.15)', borderColor: '#3DD68C' }]}
                 onPress={() => {
                   const openLootBag = useGameStore.getState().openLootBag;
                   const rewards = openLootBag();
@@ -364,7 +364,7 @@ const SellModal: React.FC<{
               </TouchableOpacity>
               {(item?.quantity ?? 0) > 1 && (
                 <TouchableOpacity
-                  style={[styles.modalButton, { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: '#10b981' }]}
+                  style={[styles.modalButton, { backgroundColor: 'rgba(61, 214, 140, 0.15)', borderColor: '#3DD68C' }]}
                   onPress={() => {
                     const openAllLootBags = useGameStore.getState().openAllLootBags;
                     const rewardsAll = openAllLootBags();
@@ -399,7 +399,7 @@ const SellModal: React.FC<{
                   <Text style={styles.dropIcon}>💰</Text>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.dropName}>Gold</Text>
-                    <Text style={styles.dropChance}>+{lootRewards.gold} gp</Text>
+                    <Text style={styles.dropChance}>+${formatCash(lootRewards.gold)}</Text>
                   </View>
                 </View>
                 {lootRewards.items.map((item, idx) => {
@@ -415,7 +415,7 @@ const SellModal: React.FC<{
                   );
                 })}
                 {lootRewards.items.length === 0 && (
-                  <Text style={{ color: '#9ca3af', textAlign: 'center', marginVertical: 12 }}>No items this time, better luck next bag!</Text>
+                  <Text style={{ color: '#A8A097', textAlign: 'center', marginVertical: 12 }}>No items this time, better luck next bag!</Text>
                 )}
               </View>
               <TouchableOpacity
@@ -566,7 +566,7 @@ export const BankSlot: React.FC<Props> = ({ slotIndex, item, position, isSelecte
   // Change detection for add/remove animations
   const prevItemRef = useRef<BankItem | null>(item ?? null);
   const [changeText, setChangeText] = useState<string>('');
-  const [changeColor, setChangeColor] = useState<string>('#10b981');
+  const [changeColor, setChangeColor] = useState<string>('#3DD68C');
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const badgeOpacity = useRef(new Animated.Value(0)).current;
   const badgeTranslateY = useRef(new Animated.Value(0)).current;
@@ -608,7 +608,7 @@ export const BankSlot: React.FC<Props> = ({ slotIndex, item, position, isSelecte
     if (shouldAnimate && delta !== 0) {
       const positive = delta > 0;
       setChangeText(`${positive ? '+' : ''}${delta}`);
-      setChangeColor(positive ? '#10b981' : '#ef4444');
+      setChangeColor(positive ? '#3DD68C' : '#E5484D');
       lastAnimationTime.current = now;
 
       // Bump animation id to invalidate previous completions
@@ -737,7 +737,7 @@ export const BankSlot: React.FC<Props> = ({ slotIndex, item, position, isSelecte
           } : undefined}
           onSell={(amount) => {
             if (item && resource && amount > 0 && amount <= (item.quantity ?? 0)) {
-              console.log(`Selling ${amount} ${resource.name} for ${amount * sellPrice} gp`);
+              console.log(`Selling ${amount} ${resource.name} for $${amount * sellPrice}`);
               try {
                 sellItem(item.resourceId, amount);
               } catch (error) {
@@ -762,8 +762,8 @@ const styles = StyleSheet.create({
   },
   slotWithItem: {
     borderWidth: 1,
-    borderColor: '#2a2a3e',
-    backgroundColor: '#1a1a2e',
+    borderColor: '#2C2733',
+    backgroundColor: '#18151D',
     shadowColor: '#000',
     shadowOpacity: 0.2,
     shadowRadius: 6,
@@ -778,8 +778,8 @@ const styles = StyleSheet.create({
   },
   selectedSlot: {
     borderWidth: 2,
-    borderColor: '#10b981',
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderColor: '#3DD68C',
+    backgroundColor: 'rgba(61, 214, 140, 0.15)',
   },
   itemContainer: {
     alignItems: 'center',
@@ -814,11 +814,11 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '90%',
     maxWidth: 380,
-    backgroundColor: '#0f0f23',
+    backgroundColor: '#0E0C11',
     borderRadius: 16,
     padding: 24,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
   },
   modalHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   modalTitle: {
@@ -840,7 +840,7 @@ const styles = StyleSheet.create({
   },
   itemDisplayWithTab: {
     borderWidth: 2,
-    borderColor: '#10b981',
+    borderColor: '#3DD68C',
   },
   animatedIconContainer: {
     alignItems: 'center',
@@ -858,7 +858,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   quantityLabel: {
-    color: '#9ca3af',
+    color: '#A8A097',
     fontSize: 14,
     marginBottom: 8,
   },
@@ -871,9 +871,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   quantityInput: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -882,14 +882,14 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
   },
   quantityMax: {
-    color: '#6b7280',
+    color: '#7A7269',
     fontSize: 14,
   },
   tabIndicator: {
     position: 'absolute',
     top: -8,
     right: -8,
-    backgroundColor: '#10b981',
+    backgroundColor: '#3DD68C',
     borderRadius: 12,
     width: 24,
     height: 24,
@@ -900,20 +900,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   priceInfo: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    backgroundColor: 'rgba(61, 214, 140, 0.1)',
     borderRadius: 10,
     padding: 12,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderColor: 'rgba(61, 214, 140, 0.3)',
   },
   priceText: {
-    color: '#9ca3af',
+    color: '#A8A097',
     fontSize: 13,
     marginBottom: 4,
   },
   totalText: {
-    color: '#10b981',
+    color: '#3DD68C',
     fontSize: 16,
     fontWeight: '700' as const,
   },
@@ -929,7 +929,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
   },
   quickButtonText: {
     color: '#fff',
@@ -948,18 +948,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   sellButton: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderColor: '#10b981',
+    backgroundColor: 'rgba(61, 214, 140, 0.15)',
+    borderColor: '#3DD68C',
   },
 
   cancelButton: {
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderColor: '#374151',
+    borderColor: '#3E3648',
   },
-  equipStatsCard: { backgroundColor: '#111827', borderRadius: 10, borderWidth: 1, borderColor: '#1f2937', padding: 12, marginBottom: 12 },
-  equipStatsTitle: { color: '#e5e7eb', fontWeight: '700' as const, marginBottom: 6, textAlign: 'center' },
+  equipStatsCard: { backgroundColor: '#16131A', borderRadius: 10, borderWidth: 1, borderColor: '#2C2733', padding: 12, marginBottom: 12 },
+  equipStatsTitle: { color: '#E8E1D6', fontWeight: '700' as const, marginBottom: 6, textAlign: 'center' },
   equipStatsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
-  equipStat: { color: '#9ca3af', fontSize: 12 },
+  equipStat: { color: '#A8A097', fontSize: 12 },
   pulseOverlay: {
     ...StyleSheet.absoluteFillObject as any,
     borderWidth: 2,
@@ -984,8 +984,8 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
   },
   assignTabButton: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-    borderColor: '#3b82f6',
+    backgroundColor: 'rgba(184, 50, 58, 0.15)',
+    borderColor: '#B8323A',
   },
   tabMenuOverlay: {
     position: 'absolute',
@@ -998,13 +998,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabMenu: {
-    backgroundColor: '#0f0f23',
+    backgroundColor: '#0E0C11',
     borderRadius: 12,
     padding: 16,
     width: '80%',
     maxWidth: 300,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
   },
   tabMenuTitle: {
     color: '#fff',
@@ -1020,11 +1020,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
   },
   tabMenuItemActive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderColor: '#10b981',
+    backgroundColor: 'rgba(61, 214, 140, 0.15)',
+    borderColor: '#3DD68C',
   },
   tabMenuItemRow: {
     flexDirection: 'row',
@@ -1037,9 +1037,9 @@ const styles = StyleSheet.create({
     fontWeight: '500' as const,
   },
   tabMenuItemAssigned: {
-    borderColor: '#10b981',
+    borderColor: '#3DD68C',
     borderWidth: 2,
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    backgroundColor: 'rgba(61, 214, 140, 0.2)',
   },
   sellAnimContainer: {
     position: 'absolute',
@@ -1049,7 +1049,7 @@ const styles = StyleSheet.create({
     marginTop: -10,
   },
   sellAnimText: {
-    color: '#10b981',
+    color: '#3DD68C',
     fontSize: 24,
     fontWeight: 'bold' as const,
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
@@ -1065,7 +1065,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   descriptionText: {
-    color: '#d1d5db',
+    color: '#D4CCC1',
     fontSize: 13,
     lineHeight: 18,
     fontStyle: 'italic' as const,
@@ -1079,7 +1079,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
   },
   dropIcon: {
     fontSize: 24,
@@ -1090,7 +1090,7 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
   },
   dropChance: {
-    color: '#9ca3af',
+    color: '#A8A097',
     fontSize: 12,
   },
 });

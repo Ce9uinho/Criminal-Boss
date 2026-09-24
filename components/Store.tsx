@@ -192,14 +192,14 @@ export function Store({ targetResourceId }: StoreProps) {
     >
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <ShoppingCart size={32} color="#4ade80" />
+          <ShoppingCart size={32} color="#E0B252" />
           <View style={styles.headerText}>
             <Text style={styles.headerTitle}>Black Market Store</Text>
             <Text style={styles.headerSubtitle}>Buy materials, upgrades, and CBcoin</Text>
           </View>
           <View style={styles.walletRow}>
             <View style={styles.walletPill} testID="wallet-gold">
-              <Coins size={14} color="#ffd700" />
+              <Coins size={14} color="#E0B252" />
               <Text style={styles.walletText}>${formatCash(gold)}</Text>
             </View>
             <View style={[styles.walletPill, styles.walletPillPremium]} testID="wallet-cbcoin">
@@ -244,7 +244,7 @@ export function Store({ targetResourceId }: StoreProps) {
                 isHighlighted && {
                   borderColor: highlightAnimation.interpolate({
                     inputRange: [0, 1],
-                    outputRange: ['#2a2a3e', '#4ade80'],
+                    outputRange: ['#2C2733', '#E0B252'],
                   }),
                   borderWidth: highlightAnimation.interpolate({
                     inputRange: [0, 1],
@@ -252,7 +252,7 @@ export function Store({ targetResourceId }: StoreProps) {
                   }),
                   backgroundColor: highlightAnimation.interpolate({
                     inputRange: [0, 0.5, 1],
-                    outputRange: ['#1a1a2e', '#2a3a4e', '#1a1a2e'],
+                    outputRange: ['#18151D', '#3E3648', '#18151D'],
                   }),
                 }
               ]}
@@ -402,12 +402,12 @@ export function Store({ targetResourceId }: StoreProps) {
         {tab === 'premium' && (
           <>
             <Text style={styles.sectionTitle}>CBcoin Shop</Text>
-            <View style={[styles.itemCard, { borderColor: '#10b981' }]} testID="rewarded-ads-card">
+            <View style={[styles.itemCard, { borderColor: '#3DD68C' }]} testID="rewarded-ads-card">
               <View style={styles.itemHeader}>
-                <Crown size={28} color="#10b981" />
+                <Crown size={28} color="#3DD68C" />
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemName}>Watch Ads • Earn CBcoin</Text>
-                  <Text style={[styles.itemPrice, { color: '#34d399' }]}>Each ad grants 5 common input items. Watch {adsGoal} ads to earn 5 CBcoin</Text>
+                  <Text style={[styles.itemPrice, { color: '#3DD68C' }]}>Each ad grants 5 common input items. Watch {adsGoal} ads to earn 5 CBcoin</Text>
                   <Text style={styles.itemDescription}>Tap Watch Ad to simulate a rewarded video. Progress: {adsWatched}/{adsGoal}</Text>
                 </View>
               </View>
@@ -442,7 +442,7 @@ export function Store({ targetResourceId }: StoreProps) {
             </View>
             <View style={[styles.itemCard, { borderColor: '#6d28d9' }]} testID="premium-pack-1">
               <View style={styles.itemHeader}>
-                <Bitcoin size={28} color="#f59e0b" />
+                <Bitcoin size={28} color="#E0B252" />
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemName}>Small Pack</Text>
                   <Text style={[styles.itemPrice, { color: '#a78bfa' }]}>50 CBcoin</Text>
@@ -470,7 +470,7 @@ export function Store({ targetResourceId }: StoreProps) {
 
             <View style={[styles.itemCard, { borderColor: '#6d28d9' }]} testID="premium-pack-2">
               <View style={styles.itemHeader}>
-                <Bitcoin size={28} color="#fbbf24" />
+                <Bitcoin size={28} color="#E0B252" />
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemName}>Medium Pack</Text>
                   <Text style={[styles.itemPrice, { color: '#c4b5fd' }]}>120 CBcoin</Text>
@@ -549,7 +549,7 @@ export function Store({ targetResourceId }: StoreProps) {
         <View pointerEvents="auto" style={styles.popupOverlay} testID="ad-reward-popup">
           <Animated.View style={[styles.popupCard, { opacity: popupOpacity, transform: [{ scale: popupOpacity.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1] }) }] }]}>
             <View style={styles.popupHeaderRow}>
-              <Crown size={22} color="#34d399" />
+              <Crown size={22} color="#3DD68C" />
               <Text style={styles.popupTitle}>Recompensa do anúncio</Text>
               <View style={{ flex: 1 }} />
               <TouchableOpacity onPress={() => setAdPopupVisible(false)} style={styles.closeBtn} testID="ad-popup-close">
@@ -594,16 +594,16 @@ export function Store({ targetResourceId }: StoreProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f0f1a',
+    backgroundColor: '#0E0C11',
   },
   contentContainer: {
     paddingBottom: 20,
   },
   header: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#2a2a3e',
+    borderBottomColor: '#2C2733',
   },
   headerContent: {
     flexDirection: 'row',
@@ -620,7 +620,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#888',
+    color: '#8F877E',
     marginTop: 2,
   },
   walletRow: {
@@ -631,16 +631,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#2a2a3e',
+    backgroundColor: '#2C2733',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
   },
   walletPillPremium: {
     backgroundColor: '#92400e',
-    borderColor: '#f59e0b',
+    borderColor: '#E0B252',
   },
   walletText: {
     color: '#fff',
@@ -653,7 +653,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#4ade80',
+    color: '#E0B252',
     marginTop: 16,
     marginBottom: 12,
   },
@@ -664,32 +664,32 @@ const styles = StyleSheet.create({
   },
   tabBtn: {
     flex: 1,
-    backgroundColor: '#101020',
-    borderColor: '#2a2a3e',
+    backgroundColor: '#0E0C11',
+    borderColor: '#2C2733',
     borderWidth: 1,
     paddingVertical: 8,
     borderRadius: 8,
     alignItems: 'center',
   },
   tabBtnActive: {
-    backgroundColor: 'rgba(74, 222, 128, 0.1)',
-    borderColor: '#4ade80',
+    backgroundColor: 'rgba(224, 178, 82, 0.1)',
+    borderColor: '#E0B252',
   },
   tabText: {
-    color: '#888',
+    color: '#8F877E',
     fontWeight: '700',
     fontSize: 12,
   },
   tabTextActive: {
-    color: '#4ade80',
+    color: '#E0B252',
   },
   itemCard: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
   },
   itemHeader: {
     flexDirection: 'row',
@@ -710,17 +710,17 @@ const styles = StyleSheet.create({
   },
   itemPrice: {
     fontSize: 14,
-    color: '#4ade80',
+    color: '#E0B252',
     marginTop: 2,
   },
   bankQuantity: {
     fontSize: 12,
-    color: '#888',
+    color: '#8F877E',
     marginTop: 2,
   },
   itemDescription: {
     fontSize: 11,
-    color: '#aaa',
+    color: '#A8A097',
     marginTop: 4,
     fontStyle: 'italic',
     lineHeight: 14,
@@ -744,20 +744,20 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   quickButton: {
-    backgroundColor: '#2a2a3e',
+    backgroundColor: '#2C2733',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#4ade80',
+    borderColor: '#E0B252',
   },
   quickButtonText: {
-    color: '#4ade80',
+    color: '#E0B252',
     fontSize: 12,
     fontWeight: 'bold',
   },
   quantityButton: {
-    backgroundColor: '#2a2a3e',
+    backgroundColor: '#2C2733',
     width: 32,
     height: 32,
     borderRadius: 6,
@@ -765,7 +765,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   quantityInput: {
-    backgroundColor: '#0f0f1a',
+    backgroundColor: '#0E0C11',
     color: '#fff',
     textAlign: 'center',
     fontSize: 16,
@@ -775,16 +775,16 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
   },
   buyButton: {
-    backgroundColor: '#4ade80',
+    backgroundColor: '#E0B252',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
   },
   buyButtonDisabled: {
-    backgroundColor: '#333',
+    backgroundColor: '#3E3648',
   },
   buyButtonText: {
     color: '#000',
@@ -792,7 +792,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   buyButtonTextDisabled: {
-    color: '#666',
+    color: '#6F685F',
   },
   premiumActionsRow: {
     flexDirection: 'row',
@@ -812,8 +812,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   goldButton: {
-    backgroundColor: '#4ade80',
-    borderColor: '#16a34a',
+    backgroundColor: '#E0B252',
+    borderColor: '#2FA86C',
   },
   realMoneyButton: {
     backgroundColor: '#b45309',
@@ -841,9 +841,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   popupCard: {
-    backgroundColor: 'rgba(26,26,46,0.98)',
+    backgroundColor: 'rgba(24, 21, 29,0.98)',
     borderWidth: 1,
-    borderColor: '#4ade80',
+    borderColor: '#E0B252',
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -866,7 +866,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   popupMessage: {
-    color: '#d1fae5',
+    color: '#F6E7C1',
     fontSize: 12,
     lineHeight: 16,
     marginBottom: 12,
@@ -876,33 +876,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     backgroundColor: 'rgba(52,211,153,0.08)',
-    borderColor: '#34d399',
+    borderColor: '#3DD68C',
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 999,
   },
   awardIcon: { fontSize: 14 },
-  awardText: { color: '#e5e7eb', fontSize: 12, fontWeight: '700' as const },
-  rewardBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#065f46', borderColor: '#34d399', borderWidth: 1, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 10 },
+  awardText: { color: '#E8E1D6', fontSize: 12, fontWeight: '700' as const },
+  rewardBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#1E5B3F', borderColor: '#3DD68C', borderWidth: 1, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 10 },
   rewardBannerText: { color: '#ecfccb', fontSize: 12, fontWeight: '800' as const },
-  progressText: { color: '#9ca3af', fontSize: 12 },
+  progressText: { color: '#A8A097', fontSize: 12 },
   closeBtn: {
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 8,
     padding: 6,
     borderWidth: 1,
-    borderColor: '#2a2a3e',
+    borderColor: '#2C2733',
   },
   primaryCloseBtn: {
     marginTop: 8,
-    backgroundColor: '#4ade80',
+    backgroundColor: '#E0B252',
     paddingVertical: 10,
     borderRadius: 8,
     alignItems: 'center',
   },
   primaryCloseBtnText: {
-    color: '#0f0f1a',
+    color: '#0E0C11',
     fontWeight: 'bold' as const,
     fontSize: 14,
   },

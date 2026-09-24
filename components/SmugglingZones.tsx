@@ -81,7 +81,7 @@ export function SmugglingZones() {
   const skillDescription = SKILL_DESCRIPTIONS['smuggling'] || '';
 
   const getZoneIcon = (zoneId: string, isLocked: boolean) => {
-    const iconColor = isLocked ? '#666' : '#4ade80';
+    const iconColor = isLocked ? '#6F685F' : '#E0B252';
     const iconSize = 20;
     
     switch (zoneId) {
@@ -128,7 +128,7 @@ export function SmugglingZones() {
             testID="smuggling-tools-banner"
           >
             <View style={styles.toolsBannerLeft}>
-              <Wrench size={18} color="#9ca3af" />
+              <Wrench size={18} color="#A8A097" />
               <Text style={styles.toolsBannerTitle}>Crews</Text>
             </View>
           </TouchableOpacity>
@@ -201,7 +201,12 @@ export function SmugglingZones() {
                   </View>
                   <View style={styles.zoneInfo}>
                     <Text style={[styles.zoneName, isLocked && styles.lockedText]}>{zone.name}</Text>
-                    <Text style={[styles.zoneLevel, isLocked && styles.lockedText]}>Level {zone.levelRequired}</Text>
+                    <View style={styles.zoneMetaRow}>
+                      <Text style={[styles.zoneLevel, isLocked && styles.lockedText]}>{isLocked ? `🔒 Unlocks at Lv ${zone.levelRequired}` : `Lv ${zone.levelRequired}`}</Text>
+                      {isActive && (
+                        <View style={styles.activeIndicator}><View style={styles.activeDot} /><Text style={styles.activeText}>RUNNING</Text></View>
+                      )}
+                    </View>
                   </View>
                   <View style={styles.headerButtons}>
                     <TouchableOpacity
@@ -210,7 +215,7 @@ export function SmugglingZones() {
                       disabled={false}
                       testID={`perks-btn-${zone.id}`}
                     >
-                      <Info size={16} color="#94a3b8" />
+                      <Info size={16} color="#A8A097" />
                       <Text style={styles.iconButtonText}>Perks</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -219,14 +224,11 @@ export function SmugglingZones() {
                       disabled={false}
                       testID={`drops-btn-${zone.id}`}
                     >
-                      <Package size={16} color="#94a3b8" />
+                      <Package size={16} color="#A8A097" />
                       <Text style={styles.iconButtonText}>Drops</Text>
                     </TouchableOpacity>
 
                   </View>
-                  {isActive && (
-                    <View style={styles.activeIndicator}><Text style={styles.activeText}>ACTIVE</Text></View>
-                  )}
                 </View>
 
                 {isActive && (
@@ -312,11 +314,11 @@ function DropsModal({ visible, onClose, zone, playerLevel, effectiveJunk }: Drop
         <TouchableOpacity style={styles.modalCard} activeOpacity={1} onPress={(e) => e.stopPropagation()} testID="drops-modal">
           <View style={styles.modalHeader}>
             <View style={styles.modalTitleContainer}>
-              <Package size={18} color="#4ade80" />
+              <Package size={18} color="#E0B252" />
               <Text style={styles.modalTitle}>Drops — {zone.name}</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn} testID="drops-modal-close">
-              <X size={18} color="#94a3b8" />
+              <X size={18} color="#A8A097" />
             </TouchableOpacity>
           </View>
           
@@ -375,18 +377,18 @@ function DropsModal({ visible, onClose, zone, playerLevel, effectiveJunk }: Drop
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f0f1a',
+    backgroundColor: '#0E0C11',
     paddingHorizontal: 12,
     paddingTop: 8,
   },
   cardContainer: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#18151D',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#16213e',
-    shadowColor: '#4ade80',
+    borderColor: '#1D1922',
+    shadowColor: '#E0B252',
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 8,
   },
@@ -407,16 +409,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   zoneCard: {
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     borderRadius: 12,
     padding: 12,
     borderWidth: 2,
-    borderColor: '#0f3460',
+    borderColor: '#2A2531',
     marginBottom: 12,
   },
   activeCard: {
-    borderColor: '#4ade80',
-    backgroundColor: '#0f3460',
+    borderColor: '#E0B252',
+    backgroundColor: '#2A2531',
   },
   lockedCard: {
     opacity: 0.6,
@@ -431,26 +433,25 @@ const styles = StyleSheet.create({
   zoneIconContainer: {
     width: 32,
     height: 32,
-    backgroundColor: '#0f1419',
+    backgroundColor: '#121016',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#233046',
+    borderColor: '#2C2733',
     justifyContent: 'center',
     alignItems: 'center',
   },
   zoneInfo: { flex: 1, marginLeft: 8 },
   zoneName: {
     fontSize: 15,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: '#fff',
   },
   zoneLevel: {
     fontSize: 11,
-    color: '#9ca3af',
-    marginTop: 2,
+    color: '#A8A097',
   },
   lockedText: {
-    color: '#666',
+    color: '#6F685F',
   },
   headerButtons: {
     flexDirection: 'row',
@@ -463,37 +464,49 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    backgroundColor: '#0f1b2d',
+    backgroundColor: '#16131A',
     borderWidth: 1,
-    borderColor: '#233046',
+    borderColor: '#2C2733',
     borderRadius: 8,
   },
   iconButtonText: {
-    color: '#94a3b8',
+    color: '#A8A097',
     fontSize: 12,
     fontWeight: '600',
   },
+  zoneMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
   activeIndicator: {
-    backgroundColor: '#16a34a',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  activeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#3DD68C',
   },
   activeText: {
-    color: '#fff',
+    color: '#3DD68C',
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: 1,
   },
   progressContainerTop: {
     height: 4,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#0B0A0D',
     borderRadius: 2,
     overflow: 'hidden',
     marginBottom: 8,
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#4ade80',
+    backgroundColor: '#E0B252',
   },
   zoneStats: {
     flexDirection: 'row',
@@ -502,15 +515,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   statRow: { alignItems: 'center' },
-  statLabel: { fontSize: 11, color: '#9ca3af' },
+  statLabel: { fontSize: 11, color: '#A8A097' },
   statValue: { fontSize: 13, color: '#fff', fontWeight: '700', marginTop: 2 },
-  bonusText: { color: '#4ade80' },
+  bonusText: { color: '#E0B252' },
   masteryRow: {
     borderTopWidth: 1,
-    borderTopColor: '#2a2a3e',
+    borderTopColor: '#2C2733',
     paddingTop: 8,
   },
-  masteryText: { fontSize: 12, color: '#fbbf24', fontWeight: '700' },
+  masteryText: { fontSize: 12, color: '#E0B252', fontWeight: '700' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.85)',
@@ -521,10 +534,10 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 420,
-    backgroundColor: '#0f1419',
+    backgroundColor: '#121016',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#1e293b',
+    borderColor: '#221E29',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
@@ -539,7 +552,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
+    borderBottomColor: '#221E29',
   },
   modalTitleContainer: {
     flexDirection: 'row',
@@ -554,7 +567,7 @@ const styles = StyleSheet.create({
   closeBtn: { 
     padding: 8,
     borderRadius: 8,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#221E29',
   },
   modalSubContainer: {
     flexDirection: 'row',
@@ -562,20 +575,20 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
+    borderBottomColor: '#221E29',
   },
   statBadge: {
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#233046',
+    borderColor: '#2C2733',
     alignItems: 'center',
     flex: 1,
   },
   statBadgeLabel: {
-    color: '#94a3b8',
+    color: '#A8A097',
     fontSize: 10,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -598,10 +611,10 @@ const styles = StyleSheet.create({
   },
   dropItem: {
     flex: 1,
-    backgroundColor: '#16213e',
+    backgroundColor: '#1D1922',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#233046',
+    borderColor: '#2C2733',
     padding: 8,
     minHeight: 80,
     position: 'relative',
@@ -613,10 +626,10 @@ const styles = StyleSheet.create({
   dropIconContainer: {
     width: 32,
     height: 32,
-    backgroundColor: '#0f1419',
+    backgroundColor: '#121016',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#1e293b',
+    borderColor: '#221E29',
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
@@ -637,7 +650,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   dropLockedText: { 
-    color: '#64748b' 
+    color: '#7A7269' 
   },
   dropMetaRow: {
     flexDirection: 'row',
@@ -647,7 +660,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   dropChance: {
-    backgroundColor: '#4ade80',
+    backgroundColor: '#E0B252',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -658,22 +671,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   dropMeta: { 
-    color: '#94a3b8', 
+    color: '#A8A097', 
     fontSize: 10,
     fontWeight: '500',
   },
   dropLockedMeta: {
-    color: '#64748b',
+    color: '#7A7269',
   },
   levelBadge: {
-    backgroundColor: '#fbbf24',
+    backgroundColor: '#E0B252',
     paddingHorizontal: 4,
     paddingVertical: 1,
     borderRadius: 3,
     alignSelf: 'center',
   },
   levelBadgeLocked: {
-    backgroundColor: '#374151',
+    backgroundColor: '#3E3648',
   },
   levelBadgeText: {
     color: '#000',
@@ -681,35 +694,35 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   levelBadgeTextLocked: {
-    color: '#9ca3af',
+    color: '#A8A097',
   },
 
   toolsBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#0e1422',
+    backgroundColor: '#121016',
     borderWidth: 1,
-    borderColor: '#223046',
+    borderColor: '#2C2733',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginBottom: 12,
   },
   managerHeader: {
-    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+    backgroundColor: 'rgba(184, 50, 58, 0.08)',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 2,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
+    borderColor: 'rgba(184, 50, 58, 0.3)',
     position: 'relative',
     overflow: 'hidden',
   },
   containerWithManager: {
-    borderColor: '#3b82f6',
+    borderColor: '#B8323A',
     borderWidth: 2,
-    shadowColor: '#3b82f6',
+    shadowColor: '#B8323A',
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
@@ -734,7 +747,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    backgroundColor: 'rgba(184, 50, 58, 0.2)',
     zIndex: 1,
   },
   managerInfo: {
@@ -744,7 +757,7 @@ const styles = StyleSheet.create({
   managerTitle: {
     fontSize: 10,
     fontWeight: '900',
-    color: '#60a5fa',
+    color: '#E0B252',
     letterSpacing: 1,
     marginBottom: 2,
   },
@@ -756,29 +769,29 @@ const styles = StyleSheet.create({
   },
   managerDescription: {
     fontSize: 11,
-    color: '#cbd5e1',
+    color: '#E8E1D6',
     lineHeight: 14,
     fontStyle: 'italic',
   },
   managerBadge: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    backgroundColor: 'rgba(184, 50, 58, 0.2)',
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.4)',
+    borderColor: 'rgba(184, 50, 58, 0.4)',
   },
   managerBadgeText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#60a5fa',
+    color: '#E0B252',
     letterSpacing: 0.5,
   },
   managerBonuses: { marginTop: 8 },
   managerBonusesTitle: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#94a3b8',
+    color: '#A8A097',
     marginBottom: 8,
     letterSpacing: 0.5,
   },
@@ -788,17 +801,17 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   managerBonusChip: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    backgroundColor: 'rgba(184, 50, 58, 0.15)',
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
+    borderColor: 'rgba(184, 50, 58, 0.3)',
   },
   managerBonusText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#bfdbfe',
+    color: '#F6E7C1',
   },
   toolsBannerLeft: {
     flexDirection: 'row',
@@ -806,7 +819,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   toolsBannerTitle: {
-    color: '#e5e7eb',
+    color: '#E8E1D6',
     fontWeight: '800',
     fontSize: 16,
   },

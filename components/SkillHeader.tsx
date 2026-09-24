@@ -1,276 +1,250 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, View, Text, StyleSheet } from 'react-native';
 import { useGameStore } from '@/store/gameStore';
-import { SKILL_ICONS, getXpForLevel } from '@/constants/gameData';
+import { SKILL_ICONS, getXpForLevel, MAX_LEVEL } from '@/constants/gameData';
 import { formatCash } from '@/constants/numberFormat';
+import { theme, skillColor } from '@/constants/theme';
 import { HeaderXpToasts } from './XpToasts';
 
 interface SkillHeaderProps {
-    selectedSkill: string;
+  selectedSkill: string;
+}
+
+function heatTone(heat: number) {
+  if (heat > 75) return { color: theme.colors.crimson, label: 'WANTED' };
+  if (heat > 50) return { color: theme.colors.heat, label: 'HOT' };
+  if (heat > 25) return { color: theme.colors.gold, label: 'WARM' };
+  return { color: theme.colors.emerald, label: 'COOL' };
 }
 
 export function SkillHeader({ selectedSkill }: SkillHeaderProps) {
-    const { skills, heat } = useGameStore();
-    const skill = skills[selectedSkill];
+  const skill = useGameStore(s => s.skills[selectedSkill]);
+  const heat = useGameStore(s => s.heat);
+  const pulse = useRef(new Animated.Value(0)).current;
 
-    if (!skill) {
-        return null;
+  const isActive = !!skill?.isActive;
+  useEffect(() => {
+    if (!isActive) {
+      pulse.stopAnimation();
+      pulse.setValue(0);
+      return;
     }
-
-    const renderXpBar = () => {
-        const lvl = skill.level ?? 1;
-        const exp = skill.experience ?? 0;
-
-        if (lvl >= 100) {
-            return (
-                <View style={styles.mafiaXpBar}>
-                    <View style={[styles.mafiaXpFill, { width: '100%' }]} />
-                </View>
-            );
-        }
-
-        const currentLevelXp = getXpForLevel(lvl);
-        const nextLevelXp = getXpForLevel(lvl + 1);
-        const denom = Math.max(1, (nextLevelXp ?? 0) - currentLevelXp);
-        const pct = Math.min(100, Math.max(0, ((exp - currentLevelXp) / denom) * 100));
-
-        return (
-            <View style={styles.mafiaXpBar}>
-                <View style={[styles.mafiaXpFill, { width: `${pct}%` }]} />
-            </View>
-        );
-    };
-
-    const renderXpToNext = () => {
-        const lvl = skill.level ?? 1;
-
-        if (lvl >= 100) {
-            return 'MAX LEVEL';
-        }
-
-        const nextLevelXp = getXpForLevel(lvl + 1);
-        const remaining = (nextLevelXp ?? 0) - (skill.experience ?? 0);
-
-        return remaining > 0 ? `${formatCash(remaining)} TO NEXT LEVEL` : 'MAX LEVEL';
-    };
-
-    return (
-        <View style={styles.skillHeader}>
-            <View style={styles.mafiaHeaderContainer}>
-                <View style={styles.mafiaHeaderLeft}>
-                    <View style={styles.skillIconContainer}>
-                        <Text style={styles.mafiaSkillIcon}>{SKILL_ICONS[selectedSkill]}</Text>
-                    </View>
-                    <View style={styles.skillInfoContainer}>
-                        <Text style={styles.mafiaSkillName}>{skill.name ?? 'Skill'}</Text>
-                        <Text style={styles.mafiaSkillLevel}>LEVEL {skill.level ?? 1}/100</Text>
-                    </View>
-                </View>
-                <View style={styles.mafiaHeaderRight}>
-                    <View style={styles.xpContainer}>
-                        <Text style={styles.mafiaXpLabel}>EXPERIENCE</Text>
-                        <Text style={styles.mafiaXpValue}>{formatCash(skill.experience ?? 0)}</Text>
-                    </View>
-                    <View style={styles.progressContainer}>
-                        {renderXpBar()}
-                        <Text style={styles.mafiaXpToNext}>
-                            {renderXpToNext()}
-                        </Text>
-                    </View>
-                </View>
-                {selectedSkill === 'thieving' && (
-                    <View style={styles.headerHeatContainer} testID="heat-section">
-                        <View style={styles.heatHeaderBottom}>
-                            <Text style={styles.heatLabel}>🔥 Heat Level</Text>
-                            <Text style={[
-                                styles.heatValue,
-                                heat > 75 ? styles.heatCritical : heat > 50 ? styles.heatHigh : heat > 25 ? styles.heatMedium : styles.heatLow
-                            ]}>
-                                {heat}%
-                            </Text>
-                        </View>
-                        <View style={styles.heatBar}>
-                            <View style={[
-                                styles.heatFill,
-                                heat > 75 ? styles.heatFillCritical : heat > 50 ? styles.heatFillHigh : heat > 25 ? styles.heatFillMedium : styles.heatFillLow,
-                                { width: `${Math.min(heat, 100)}%` }
-                            ]} />
-                        </View>
-                    </View>
-                )}
-            </View>
-            <HeaderXpToasts skillId={selectedSkill as string} />
-        </View>
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 700, useNativeDriver: true }),
+      ]),
     );
+    loop.start();
+    return () => loop.stop();
+  }, [isActive, pulse]);
+
+  if (!skill) return null;
+
+  const accent = skillColor(selectedSkill);
+  const lvl = skill.level ?? 1;
+  const exp = skill.experience ?? 0;
+  const maxed = lvl >= MAX_LEVEL;
+  const currentLevelXp = getXpForLevel(lvl);
+  const nextLevelXp = getXpForLevel(lvl + 1);
+  const pct = maxed ? 100 : Math.min(100, Math.max(0, ((exp - currentLevelXp) / Math.max(1, nextLevelXp - currentLevelXp)) * 100));
+  const remaining = Math.max(0, nextLevelXp - exp);
+  const tone = heatTone(heat);
+
+  return (
+    <View style={styles.wrap}>
+      <View style={[styles.card, { borderColor: `${accent}55` }]}>
+        <View style={[styles.glow, { backgroundColor: accent }]} />
+        <View style={styles.topRow}>
+          <View style={[styles.iconBox, { backgroundColor: `${accent}1F`, borderColor: `${accent}66` }]}>
+            <Text style={styles.icon}>{SKILL_ICONS[selectedSkill]}</Text>
+          </View>
+          <View style={styles.titleCol}>
+            <Text style={styles.name} numberOfLines={1}>{skill.name ?? 'Skill'}</Text>
+            <View style={styles.statusRow}>
+              <Animated.View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: isActive ? theme.colors.emerald : theme.colors.textDim },
+                  isActive && { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 0.35] }) },
+                ]}
+              />
+              <Text style={[styles.statusText, isActive && { color: theme.colors.emerald }]} numberOfLines={1}>
+                {isActive ? skill.currentActivity?.name ?? 'Working' : 'Idle — pick a job below'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.levelBadge}>
+            <Text style={styles.levelLabel}>LEVEL</Text>
+            <Text style={[styles.levelValue, { color: accent }]}>{lvl}</Text>
+          </View>
+        </View>
+
+        <View style={styles.xpTrack}>
+          <View style={[styles.xpFill, { width: `${pct}%`, backgroundColor: accent }]} />
+        </View>
+        <View style={styles.xpMeta}>
+          <Text style={styles.xpText}>{formatCash(exp)} XP</Text>
+          <Text style={styles.xpText}>{maxed ? 'MAX LEVEL' : `${formatCash(remaining)} to Lv ${lvl + 1}`}</Text>
+        </View>
+
+        {selectedSkill === 'thieving' && (
+          <View style={styles.heatBox} testID="heat-section">
+            <View style={styles.heatRow}>
+              <Text style={styles.heatLabel}>🔥 POLICE HEAT</Text>
+              <Text style={[styles.heatValue, { color: tone.color }]}>{tone.label} · {heat}%</Text>
+            </View>
+            <View style={styles.heatTrack}>
+              <View style={[styles.heatFill, { width: `${Math.min(heat, 100)}%`, backgroundColor: tone.color }]} />
+            </View>
+          </View>
+        )}
+      </View>
+      <HeaderXpToasts skillId={selectedSkill} />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    skillHeader: {
-        backgroundColor: '#0f0f1a',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        position: 'relative',
-      },
-      mafiaHeaderContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: 'rgba(139, 69, 19, 0.1)',
-        borderRadius: 8,
-        padding: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(139, 69, 19, 0.3)',
-        shadowColor: '#8b4513',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 3,
-        flexWrap: 'wrap',
-      },
-      mafiaHeaderLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-        minWidth: 160,
-      },
-      skillIconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: 'rgba(139, 69, 19, 0.2)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 2,
-        borderColor: 'rgba(139, 69, 19, 0.5)',
-        marginRight: 12,
-      },
-      mafiaSkillIcon: {
-        fontSize: 24,
-        textShadowColor: '#8b4513',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 3,
-      },
-      skillInfoContainer: {
-        flex: 1,
-      },
-      mafiaSkillName: {
-        fontSize: 18,
-        fontWeight: '800',
-        color: '#f5deb3',
-        letterSpacing: 0.5,
-        textShadowColor: 'rgba(0, 0, 0, 0.8)',
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 2,
-      },
-      mafiaSkillLevel: {
-        fontSize: 11,
-        color: '#cd853f',
-        fontWeight: '700',
-        letterSpacing: 1,
-        marginTop: 2,
-      },
-      mafiaHeaderRight: {
-        alignItems: 'flex-end',
-        minWidth: 120,
-      },
-      xpContainer: {
-        alignItems: 'flex-end',
-        marginBottom: 8,
-      },
-      mafiaXpLabel: {
-        fontSize: 9,
-        color: '#8b7355',
-        fontWeight: '600',
-        letterSpacing: 0.5,
-      },
-      mafiaXpValue: {
-        fontSize: 16,
-        fontWeight: '800',
-        color: '#daa520',
-        textShadowColor: 'rgba(218, 165, 32, 0.5)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
-      },
-      progressContainer: {
-        width: '100%',
-      },
-      mafiaXpBar: {
-        height: 6,
-        backgroundColor: 'rgba(139, 69, 19, 0.3)',
-        borderRadius: 3,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(139, 69, 19, 0.5)',
-        marginBottom: 4,
-      },
-      mafiaXpFill: {
-        height: '100%',
-        backgroundColor: '#daa520',
-        borderRadius: 2,
-        shadowColor: '#daa520',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: 3,
-      },
-      mafiaXpToNext: {
-        fontSize: 8,
-        color: '#8b7355',
-        fontWeight: '600',
-        letterSpacing: 0.3,
-        textAlign: 'right',
-      },
-      heatHeaderBottom: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-      },
-      heatLabel: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#ff6b6b',
-      },
-      heatValue: {
-        fontSize: 16,
-        fontWeight: 'bold',
-      },
-      heatLow: {
-        color: '#4ade80',
-      },
-      heatMedium: {
-        color: '#fbbf24',
-      },
-      heatHigh: {
-        color: '#fb923c',
-      },
-      heatCritical: {
-        color: '#ef4444',
-      },
-      headerHeatContainer: {
-        width: '100%',
-        marginTop: 10,
-      },
-      heatBar: {
-        height: 6,
-        backgroundColor: 'rgba(0, 0, 0, 0.3)',
-        borderRadius: 3,
-        overflow: 'hidden',
-        marginBottom: 6,
-      },
-      heatFill: {
-        height: '100%',
-        borderRadius: 3,
-      },
-      heatFillLow: {
-        backgroundColor: '#4ade80',
-      },
-      heatFillMedium: {
-        backgroundColor: '#fbbf24',
-      },
-      heatFillHigh: {
-        backgroundColor: '#fb923c',
-      },
-      heatFillCritical: {
-        backgroundColor: '#ef4444',
-      },
-})
+  wrap: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 4,
+    position: 'relative',
+  },
+  card: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    padding: 14,
+    overflow: 'hidden',
+  },
+  glow: {
+    position: 'absolute',
+    top: -60,
+    right: -40,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    opacity: 0.08,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  iconBox: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  icon: {
+    fontSize: 28,
+  },
+  titleCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  name: {
+    color: theme.colors.text,
+    fontSize: 20,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 3,
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  statusText: {
+    color: theme.colors.textMuted,
+    fontSize: 12.5,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  levelBadge: {
+    alignItems: 'center',
+    minWidth: 54,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.bgElevated,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  levelLabel: {
+    color: theme.colors.textDim,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+  },
+  levelValue: {
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 26,
+  },
+  xpTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.bgElevated,
+    marginTop: 14,
+    overflow: 'hidden',
+  },
+  xpFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  xpMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  xpText: {
+    color: theme.colors.textDim,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  heatBox: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  heatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  heatLabel: {
+    color: theme.colors.textMuted,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  heatValue: {
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  heatTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.colors.bgElevated,
+    overflow: 'hidden',
+  },
+  heatFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+});
