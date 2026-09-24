@@ -82,3 +82,17 @@ export function getPlayerAttackIntervalMs(equipped: Partial<Record<EquipmentSlot
   const secPerAttack = typeof weapon?.attackSpeed === 'number' && weapon.attackSpeed > 0 ? weapon.attackSpeed : 1.6;
   return Math.max(600, Math.floor(secPerAttack * 1000));
 }
+
+// What a Treasure Bag can contain: guaranteed cash plus an independent roll per item
+// (chance = weight / total weight).
+export const LOOT_BAG_GOLD = { min: 50, max: 150 };
+export const LOOT_BAG_TABLE: { resourceId: string; weight: number }[] = [
+  { resourceId: 'iron_dagger', weight: 15 },
+  { resourceId: 'wooden_shield', weight: 15 },
+  { resourceId: 'leather_cap', weight: 12 },
+  { resourceId: 'leather_vest', weight: 12 },
+  { resourceId: 'leather_pants', weight: 10 },
+  { resourceId: 'leather_boots', weight: 10 },
+  { resourceId: 'simple_ring', weight: 8 },
+  { resourceId: 'street_amulet', weight: 8 },
+];

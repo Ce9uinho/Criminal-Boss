@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { router } from 'expo-router';
-import { X, Settings, User, Trophy, HelpCircle, ChevronRight, ChevronDown } from 'lucide-react-native';
+import { X, Settings, User, Trophy, HelpCircle, ChevronRight, ChevronDown, BookOpen } from 'lucide-react-native';
+import { ACHIEVEMENTS } from '@/constants/achievements';
 import { useGameStore } from '@/store/gameStore';
 import { formatCash } from '@/constants/numberFormat';
 import { theme } from '@/constants/theme';
@@ -29,14 +30,17 @@ export function GameMenu({ onClose }: GameMenuProps) {
   const gold = useGameStore(s => s.gold);
   const totalLevel = useGameStore(s => Object.values(s.skills).reduce((sum, sk) => sum + (sk.level ?? 1), 0));
 
-  const go = (path: '/settings' | '/profile' | '/achievements') => {
+  const unlocked = useGameStore(s => Object.keys(s.achievementsUnlocked).length);
+
+  const go = (path: '/settings' | '/profile' | '/achievements' | '/wiki') => {
     onClose();
     router.push(path);
   };
 
   const items = [
     { icon: <User size={20} color={theme.colors.gold} />, label: 'Profile', hint: 'Name, avatar & stats', onPress: () => go('/profile') },
-    { icon: <Trophy size={20} color={theme.colors.gold} />, label: 'Achievements', hint: 'Milestones & rewards', onPress: () => go('/achievements') },
+    { icon: <Trophy size={20} color={theme.colors.gold} />, label: 'Achievements', hint: `${unlocked}/${ACHIEVEMENTS.length} unlocked · Collection Log`, onPress: () => go('/achievements') },
+    { icon: <BookOpen size={20} color={theme.colors.gold} />, label: 'Wiki', hint: 'Every job, item, upgrade and formula', onPress: () => go('/wiki') },
     { icon: <Settings size={20} color={theme.colors.gold} />, label: 'Settings', hint: 'Save data & options', onPress: () => go('/settings') },
   ];
 

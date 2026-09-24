@@ -219,6 +219,7 @@ export default function CombatScreen() {
               setSessionGold(prev => prev + goldReward);
               addResource('loot_bag', 1);
               useGameStore.getState().trackContract({ type: 'dungeon', qty: 1 });
+              useGameStore.getState().bumpStat('dungeonsCleared');
               setSessionLoot(prev => [...prev, { type: 'item', resourceId: 'loot_bag', quantity: 1, at: Date.now() }]);
               if (fightTimer.current != null) clearInterval(fightTimer.current as ReturnType<typeof setInterval>);
               fightTimer.current = null;

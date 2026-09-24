@@ -311,7 +311,7 @@ export default function SkillCard({ skill, onNavigateToStore, onNavigateToSmuggl
       },
     ]}>
       {/* Skill Description - Above the cards */}
-      <SkillBlurb text={skillDescription} />
+      <SkillBlurb text={skillDescription} skillId={skill.id} />
 
       {/* Tools Banners */}
       {skill.id === 'thieving' && (

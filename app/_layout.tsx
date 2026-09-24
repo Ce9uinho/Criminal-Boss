@@ -53,6 +53,7 @@ function RootLayoutNav() {
       <Stack.Screen name="profile" options={{ title: "Profile", ...screenHeader }} />
       <Stack.Screen name="achievements" options={{ title: "Achievements", ...screenHeader }} />
       <Stack.Screen name="combat" options={{ title: "Turf War", ...screenHeader }} />
+      <Stack.Screen name="wiki" options={{ title: "Wiki", ...screenHeader }} />
       <Stack.Screen name="+not-found" options={{ title: "Lost", ...screenHeader }} />
     </Stack>
   );

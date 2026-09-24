@@ -114,3 +114,29 @@ não havia razão para voltar no dia seguinte. Os primeiros upgrades exigiam hor
 
 **Balanceamento:** primeiros upgrades de cada skill reduzidos para ~10 minutos de jogo
 (ex.: Basic Lockpick = $500 + 15 carteiras).
+
+---
+
+## 6. Wiki e conquistas (estilo Melvor)
+
+**Wiki (antes: botão sem função).** Nova rota `/wiki`, acessível pelo menu e por cada skill
+("📖 Wiki: all jobs & drops"). É gerada a partir dos dados do jogo (`constants/wiki.ts`), por isso
+nunca fica desatualizada:
+- Pesquisa global (itens, trabalhos, skills).
+- Página por skill: mecânicas explicadas com as fórmulas reais, e tabela de todos os trabalhos
+  (nível, tempo, XP, falha/apanhado, heat, inputs, output, valor, drops com probabilidades).
+- Itens: lista filtrável por grupo; página de item com "como obter" (produção, rotas, alvos de roubo,
+  Market, loot bag — com probabilidades) e "para que serve" (receitas, upgrades, equipamento).
+- Upgrades de todas as skills com bónus legíveis e custos; Turf War (fórmulas de combate, dungeons,
+  inimigos, loot bag, equipamento); Progressão (curva de XP, mastery, agentes, patentes, contratos,
+  recompensa diária, conquistas, offline, Market); guia "Getting Started".
+
+**Conquistas (antes: recalculadas do estado, regrediam ao gastar/vender, sem recompensa).**
+- 105 conquistas individuais em 8 categorias, com medalha bronze/prata/ouro/diamante (5/10/25/50 pontos).
+- Desbloqueio **permanente**, notificação e recompensa (pontos em respeito + $100/ponto).
+- Baseadas em contadores vitalícios que nunca descem: dinheiro ganho, pico de dinheiro, viagens,
+  roubos, vezes apanhado/preso, heat máximo, dungeons, mortes, loot bags, vendas, streak, contratos,
+  patente, mastery, upgrades, slots e itens descobertos. Algumas são secretas.
+- Lista ordenada pela conquista mais perto de desbloquear.
+- **Collection Log**: grelha de todos os itens por grupo, com os não descobertos como "???";
+  tocar num item abre a página da wiki.

@@ -3,7 +3,8 @@ import { create } from 'zustand';
 import { GameState, Skill, Activity, BankItem, Mastery, SmugglingZone, BankTab, EquipmentSlot } from '@/types/game';
 import { getLevelFromXp, RESOURCES, hasRequiredInputs, SKILL_DESCRIPTIONS, getSmugglingXp, getXpForLevel, STORE_ITEMS, EQUIPMENT_CATALOG, ACTIVITIES, SMUGGLING_ZONES } from '@/constants/gameData';
 import { Contract, ContractEvent, CONTRACT_SLOTS, DAILY_REWARDS, DailyReward, applyContractEvent, dayKey, generateContract, getRankInfo, getReputation, nextStreakDay } from '@/constants/progression';
-import { COMBAT_DUNGEONS, getDungeonGoldReward, getPlayerCombatStats, getPlayerAttackIntervalMs } from '@/constants/combat';
+import { ACHIEVEMENTS, AchievementStats, achievementReward } from '@/constants/achievements';
+import { LOOT_BAG_TABLE, LOOT_BAG_GOLD, COMBAT_DUNGEONS, getDungeonGoldReward, getPlayerCombatStats, getPlayerAttackIntervalMs } from '@/constants/combat';
 import { THIEVING_TOOLS } from '@/constants/thievingTools';
 import { DRUG_TOOLS } from '@/constants/drugTools';
 import { DISTILLERY_TOOLS } from '@/constants/distilleryTools';
@@ -202,6 +203,12 @@ interface GameStore extends GameState {
   // Lifetime counters that feed achievements
   lifetimeStats: LifetimeStats;
   recordProduced: (skillId: string, amount: number) => void;
+  bumpStat: (key: CounterStat, amount?: number) => void;
+
+  // Achievements: id -> unlock timestamp (permanent)
+  achievementsUnlocked: Record<string, number>;
+  getAchievementStats: () => AchievementStats;
+  checkAchievements: () => void;
 
   // Save management
   exportSave: () => string;
@@ -212,7 +219,32 @@ interface GameStore extends GameState {
 export interface LifetimeStats {
   produced: Record<string, number>; // crafted items per skill, successful thefts for thieving
   rareCollected: number; // rare smuggling finds
+  smugglingRuns: number;
+  timesCaught: number;
+  timesArrested: number;
+  peakHeat: number;
+  dungeonsCleared: number;
+  deaths: number;
+  lootBagsOpened: number;
+  peakGold: number;
+  cashEarned: number;
+  soldValue: number;
+  bestStreak: number;
+  discovered: Record<string, number>; // resourceId -> first time it entered the stash (Collection Log)
 }
+
+export type CounterStat = 'rareCollected' | 'smugglingRuns' | 'timesCaught' | 'timesArrested' | 'dungeonsCleared' | 'deaths' | 'lootBagsOpened' | 'soldValue';
+
+export function emptyLifetimeStats(): LifetimeStats {
+  return {
+    produced: {}, rareCollected: 0, smugglingRuns: 0, timesCaught: 0, timesArrested: 0, peakHeat: 0,
+    dungeonsCleared: 0, deaths: 0, lootBagsOpened: 0, peakGold: 0, cashEarned: 0, soldValue: 0, bestStreak: 0, discovered: {},
+  };
+}
+
+// Suspended while a save is being loaded/imported so restored cash and items
+// don't count as "earned" or "discovered" again.
+let statTrackingSuspended = false;
 
 export interface GameNotice {
   id: string;
@@ -321,6 +353,8 @@ export function resolveActivity(skillId: string, activityId: string): Activity |
   return ACTIVITIES[skillId]?.find(a => a.id === activityId);
 }
 
+const SMUGGLING_ZONE_IDS = SMUGGLING_ZONES.map(z => `smuggling_${z.id}`);
+
 export function resolveZone(activityId: string): SmugglingZone | undefined {
   return SMUGGLING_ZONES.find(z => `smuggling_${z.id}` === activityId);
 }
@@ -414,11 +448,35 @@ const STARTER_EQUIPMENT: Partial<Record<EquipmentSlot, string>> = {
 
 export const useGameStore = create<GameStore>((rawSet, get) => {
   // Every state write goes through here so `bank` stays in sync with `bankItems`.
+  // It also keeps the lifetime counters that are easiest to track centrally:
+  // cash earned, peak cash and the Collection Log of discovered items.
   const set = ((partial: any, replace?: boolean) =>
     rawSet((state: GameStore) => {
-      const next = typeof partial === 'function' ? partial(state) : partial;
-      if (next && Array.isArray(next.bankItems)) {
-        return { ...next, bank: bankFromItems(next.bankItems) };
+      let next = typeof partial === 'function' ? partial(state) : partial;
+      if (!next) return next;
+      if (Array.isArray(next.bankItems)) {
+        next = { ...next, bank: bankFromItems(next.bankItems) };
+      }
+      if (!statTrackingSuspended && state.lifetimeStats) {
+        const stats: LifetimeStats = next.lifetimeStats ?? state.lifetimeStats;
+        let patch: Partial<LifetimeStats> | null = null;
+        if (typeof next.gold === 'number' && next.gold > state.gold) {
+          patch = {
+            cashEarned: (stats.cashEarned ?? 0) + (next.gold - state.gold),
+            peakGold: Math.max(stats.peakGold ?? 0, next.gold),
+          };
+        }
+        if (Array.isArray(next.bankItems)) {
+          let discovered: Record<string, number> | null = null;
+          for (const it of next.bankItems as (BankItem | null)[]) {
+            if (it && !(stats.discovered ?? {})[it.resourceId] && !discovered?.[it.resourceId]) {
+              discovered = discovered ?? { ...(stats.discovered ?? {}) };
+              discovered[it.resourceId] = Date.now();
+            }
+          }
+          if (discovered) patch = { ...(patch ?? {}), discovered };
+        }
+        if (patch) next = { ...next, lifetimeStats: { ...stats, ...patch } };
       }
       return next;
     }, replace as any)) as typeof rawSet;
@@ -464,8 +522,16 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
   bank: bankFromItems(INITIAL_BANK_ITEMS),
   notices: [],
   offlineSummary: undefined,
-  lifetimeStats: { produced: {}, rareCollected: 0 },
+  lifetimeStats: {
+    ...emptyLifetimeStats(),
+    peakGold: 5000,
+    discovered: Object.fromEntries([
+      ...INITIAL_BANK_ITEMS.filter((it): it is BankItem => !!it).map(it => it.resourceId),
+      ...Object.values(STARTER_EQUIPMENT),
+    ].map(id => [id, 0])),
+  },
   respect: 0,
+  achievementsUnlocked: {},
   contracts: [],
   contractsCompleted: 0,
   dailyStreak: 0,
@@ -528,7 +594,10 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
   getCombatSnapshot: () => get().combatSnapshot,
   clearCombatResume: () => set({ combatAutoResume: false, combatSnapshot: undefined }),
 
-  setCombatDeath: (enemyName: string) => set({ combatDeath: { enemyName, at: Date.now() } }),
+  setCombatDeath: (enemyName: string) => {
+    set({ combatDeath: { enemyName, at: Date.now() } });
+    get().bumpStat('deaths');
+  },
   clearCombatDeath: () => set({ combatDeath: undefined }),
 
   setCombatLastTab: (tab) => set({ combatLastTab: tab }),
@@ -557,6 +626,7 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
   },
 
   loadGame: async () => {
+    statTrackingSuspended = true;
     try {
       const savedGame = await AsyncStorage.getItem(SAVE_KEY);
       if (savedGame) {
@@ -648,17 +718,26 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
           lastAdWatchedAt: (gameData as any).lastAdWatchedAt,
           combatLastTab: ((gameData as any).combatLastTab as 'equipment'|'combat'|'dungeons') ?? 'combat',
           combatSelectedDungeon: (gameData as any).combatSelectedDungeon ?? 'back_alley',
-          lifetimeStats: {
-            produced: (gameData as any).lifetimeStats?.produced ?? {},
-            rareCollected: (gameData as any).lifetimeStats?.rareCollected ?? 0,
-          },
+          lifetimeStats: (() => {
+            const saved = (gameData as any).lifetimeStats ?? {};
+            const merged: LifetimeStats = { ...emptyLifetimeStats(), ...saved, produced: saved.produced ?? {}, discovered: { ...(saved.discovered ?? {}) } };
+            // Older saves: seed the Collection Log with what's already owned.
+            finalBankItems.forEach(it => { if (it && merged.discovered[it.resourceId] === undefined) merged.discovered[it.resourceId] = 0; });
+            Object.values((gameData as any).equipped ?? {}).forEach((id: any) => { if (id && merged.discovered[id] === undefined) merged.discovered[id] = 0; });
+            merged.peakGold = Math.max(merged.peakGold, typeof (gameData as any).gold === 'number' ? (gameData as any).gold : 0);
+            merged.bestStreak = Math.max(merged.bestStreak, (gameData as any).dailyStreak ?? 0);
+            return merged;
+          })(),
           respect: (gameData as any).respect ?? 0,
+          achievementsUnlocked: (gameData as any).achievementsUnlocked ?? {},
           contracts: Array.isArray((gameData as any).contracts) ? (gameData as any).contracts : [],
           contractsCompleted: (gameData as any).contractsCompleted ?? 0,
           dailyStreak: (gameData as any).dailyStreak ?? 0,
           lastDailyClaim: (gameData as any).lastDailyClaim,
         });
         
+        // Restored state is in: from here on, gains are real and should count.
+        statTrackingSuspended = false;
         // Process offline progress, then pick the activity back up
         get().processOfflineProgress(resume);
         if (resume) {
@@ -703,6 +782,7 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
         isLoading: false 
       });
     }
+    statTrackingSuspended = false;
     // Every boss needs something to do: make sure the contract board is full.
     get().refillContracts();
   },
@@ -746,6 +826,7 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
         combatSelectedDungeon,
         lifetimeStats: get().lifetimeStats,
         respect: get().respect,
+        achievementsUnlocked: get().achievementsUnlocked,
         contracts: get().contracts,
         contractsCompleted: get().contractsCompleted,
         dailyStreak: get().dailyStreak,
@@ -906,6 +987,7 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
           // Determine if it's just a fail or an arrest using static arrestChance from activity
           const staticArrestChance = Math.max(0, Math.min(100, activity.arrestChance ?? 0));
           const arrested = Math.random() * 100 < staticArrestChance;
+          get().bumpStat(arrested ? 'timesArrested' : 'timesCaught');
           
           // Static cooldowns per activity, reduced when thieving agent is unlocked
           const agentActive = get().skills.thieving.agentUnlocked ?? false;
@@ -1245,11 +1327,12 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
         }
         addResource(selectedItem.resource.id, 1);
         if (selectedItem.minLevel) {
-          set(state => ({ lifetimeStats: { ...state.lifetimeStats, rareCollected: state.lifetimeStats.rareCollected + 1 } }));
+          get().bumpStat('rareCollected');
           get().pushNotice({ kind: 'success', title: 'Rare find!', message: `Your crew smuggled in ${selectedItem.resource.name}.`, icon: selectedItem.resource.icon });
         }
       }
       get().trackContract({ type: 'run', qty: 1 });
+      get().bumpStat('smugglingRuns');
       
       // Award XP scaled to match target time-to-levels irrespective of loot composition
       const targetPerActionXp = getSmugglingXp(playerLevel, adjustedTime);
@@ -1431,6 +1514,7 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
       pool.forEach(it => gain(it.id, roundChance(goodRolls * it.weight / Math.max(1, totalWeight))));
       for (let i = 0; i < actions; i++) awardXp(Math.max(1, Math.floor(getSmugglingXp(level, actionTime))));
       get().trackContract({ type: 'run', qty: actions });
+      get().bumpStat('smugglingRuns', actions);
     } else if (resume.skillId === 'thieving') {
       const activity = resolveActivity('thieving', resume.activityId);
       if (!activity) return;
@@ -1732,6 +1816,7 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
     
     const goldEarned = (resource.value || 1) * quantity; // Default to $1 if no value
     get().trackContract({ type: 'sell', amount: goldEarned });
+    get().bumpStat('soldValue', goldEarned);
     console.log('Gold earned:', goldEarned);
     
     set(state => {
@@ -1934,6 +2019,7 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
                 get().addGold(goldReward);
                 get().addResource('loot_bag', 1);
                 get().trackContract({ type: 'dungeon', qty: 1 });
+                get().bumpStat('dungeonsCleared');
                 const items = get().combatSessionItems;
                 set({
                   combatSessionGold: get().combatSessionGold + goldReward,
@@ -2169,7 +2255,9 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
     set(state => {
       const currentHeat = state.heat;
       const newHeat = Math.max(0, Math.min(100, currentHeat + amount));
-      console.log(`Heat: ${currentHeat} -> ${newHeat} (${amount > 0 ? '+' : ''}${amount})`);
+      if (newHeat > (state.lifetimeStats.peakHeat ?? 0)) {
+        return { heat: newHeat, lifetimeStats: { ...state.lifetimeStats, peakHeat: newHeat } };
+      }
       return { heat: newHeat };
     });
   },
@@ -2571,6 +2659,7 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
       return null;
     }
 
+    get().bumpStat('lootBagsOpened');
     // Remove one loot bag
     set(state => {
       const newBankItems = [...state.bankItems];
@@ -2589,19 +2678,10 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
     });
 
     // Loot table with weighted drops
-    const lootTable = [
-      { resourceId: 'iron_dagger', weight: 15 },
-      { resourceId: 'wooden_shield', weight: 15 },
-      { resourceId: 'leather_cap', weight: 12 },
-      { resourceId: 'leather_vest', weight: 12 },
-      { resourceId: 'leather_pants', weight: 10 },
-      { resourceId: 'leather_boots', weight: 10 },
-      { resourceId: 'simple_ring', weight: 8 },
-      { resourceId: 'street_amulet', weight: 8 },
-    ];
+    const lootTable = LOOT_BAG_TABLE;
 
     // Guaranteed gold drop
-    const goldAmount = Math.floor(50 + Math.random() * 101); // 50-150 gold
+    const goldAmount = Math.floor(LOOT_BAG_GOLD.min + Math.random() * (LOOT_BAG_GOLD.max - LOOT_BAG_GOLD.min + 1));
     get().addGold(goldAmount);
     console.log(`Opened loot bag: received ${goldAmount} gold`);
 
@@ -2749,10 +2829,82 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
       respect: state.respect + reward.respect,
       dailyStreak: day === 1 ? 1 : state.dailyStreak + 1,
       lastDailyClaim: today,
+      lifetimeStats: { ...state.lifetimeStats, bestStreak: Math.max(state.lifetimeStats.bestStreak ?? 0, day === 1 ? 1 : state.dailyStreak + 1) },
     }));
     reward.items.forEach(it => get().addResource(it.resourceId, it.quantity));
     setTimeout(() => get().saveGame(), 50);
     return reward;
+  },
+
+  getAchievementStats: () => {
+    const st = get();
+    const levels = Object.fromEntries(Object.entries(st.skills).map(([id, sk]) => [id, sk.level ?? 1]));
+    const masteryAt: Record<string, Record<number, number>> = {};
+    const bump = (skillId: string, lvl: number) => {
+      const m = (masteryAt[skillId] = masteryAt[skillId] ?? { 25: 0, 50: 0, 75: 0, 100: 0 });
+      [25, 50, 75, 100].forEach(t => { if (lvl >= t) m[t] += 1; });
+    };
+    Object.entries(ACTIVITIES).forEach(([skillId, acts]) => acts.forEach(a => bump(skillId, st.mastery[a.id]?.level ?? 1)));
+    SMUGGLING_ZONE_IDS.forEach(id => bump('smuggling', st.mastery[id]?.level ?? 1));
+    const owned = (rec: Record<string, boolean>) => Object.values(rec ?? {}).filter(Boolean).length;
+    const ls = st.lifetimeStats;
+    return {
+      levels,
+      totalLevel: Object.values(levels).reduce((a, b) => a + b, 0),
+      produced: ls.produced ?? {},
+      smugglingRuns: ls.smugglingRuns ?? 0,
+      rareCollected: ls.rareCollected ?? 0,
+      timesCaught: ls.timesCaught ?? 0,
+      timesArrested: ls.timesArrested ?? 0,
+      peakHeat: ls.peakHeat ?? 0,
+      dungeonsCleared: ls.dungeonsCleared ?? 0,
+      deaths: ls.deaths ?? 0,
+      lootBagsOpened: ls.lootBagsOpened ?? 0,
+      peakGold: Math.max(ls.peakGold ?? 0, st.gold),
+      cashEarned: ls.cashEarned ?? 0,
+      soldValue: ls.soldValue ?? 0,
+      bestStreak: Math.max(ls.bestStreak ?? 0, st.dailyStreak),
+      discovered: Object.keys(ls.discovered ?? {}).length,
+      contractsCompleted: st.contractsCompleted,
+      rankIndex: getRankInfo(st.getReputation()).index,
+      toolsOwned: {
+        smuggling: owned(st.smugglingToolsOwned),
+        thieving: owned(st.thievingToolsOwned),
+        drug_factory: owned(st.drugToolsOwned),
+        distillery: owned(st.distilleryToolsOwned),
+        investigation_lab: owned(st.investigationLabToolsOwned),
+      },
+      masteryAt,
+      bankSlots: st.maxBankSlots,
+    };
+  },
+
+  checkAchievements: () => {
+    const st = get();
+    if (st.isLoading) return;
+    const stats = st.getAchievementStats();
+    const newly = ACHIEVEMENTS.filter(a => !st.achievementsUnlocked[a.id] && a.value(stats) >= a.target);
+    if (newly.length === 0) return;
+    const now = Date.now();
+    const rewards = newly.map(achievementReward);
+    const respect = rewards.reduce((sum, r) => sum + r.respect, 0);
+    const gold = rewards.reduce((sum, r) => sum + r.gold, 0);
+    set(state => ({
+      achievementsUnlocked: { ...state.achievementsUnlocked, ...Object.fromEntries(newly.map(a => [a.id, now])) },
+      respect: state.respect + respect,
+      gold: state.gold + gold,
+    }));
+    if (newly.length <= 2) {
+      newly.forEach(a => get().pushNotice({ kind: 'agent', title: `Achievement: ${a.title}`, message: `${a.description} · +$${achievementReward(a).gold.toLocaleString()} +${achievementReward(a).respect} rep`, icon: a.icon }));
+    } else {
+      get().pushNotice({ kind: 'agent', title: `${newly.length} achievements unlocked!`, message: `+$${gold.toLocaleString()} and +${respect} respect`, icon: '🏆' });
+    }
+    setTimeout(() => get().saveGame(), 50);
+  },
+
+  bumpStat: (key: CounterStat, amount = 1) => {
+    if (amount <= 0) return;
+    set(state => ({ lifetimeStats: { ...state.lifetimeStats, [key]: (state.lifetimeStats[key] ?? 0) + amount } }));
   },
 
   recordProduced: (skillId: string, amount: number) => {
@@ -2795,7 +2947,9 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
   resetGame: async () => {
     stopAllTimers();
     await AsyncStorage.removeItem(SAVE_KEY);
+    statTrackingSuspended = true;
     if (initialData) set({ ...initialData, lastSaved: Date.now(), isLoading: false } as Partial<GameStore>);
+    statTrackingSuspended = false;
     get().refillContracts();
     get().pushNotice({ kind: 'info', title: 'Fresh start', message: 'Your empire has been reset.' });
   },
@@ -2819,6 +2973,11 @@ function stopAllTimers() {
   if (st.heatDecayTimer) clearInterval(st.heatDecayTimer);
   useGameStore.setState({ activeTimers: {}, combatBgTimer: undefined, heatDecayTimer: undefined, combatIsActive: false });
 }
+
+// Achievements are checked on a light heartbeat rather than inside every action.
+setInterval(() => {
+  useGameStore.getState().checkAchievements();
+}, 1500);
 
 // Auto-save every 30 seconds
 setInterval(() => {

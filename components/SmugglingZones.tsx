@@ -121,7 +121,7 @@ export function SmugglingZones() {
     <>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false} testID="smuggling-zones">
         <View style={[styles.cardContainer, skill.level >= 100 ? styles.containerWithManager : null]}>
-          <SkillBlurb text={skillDescription} />
+          <SkillBlurb text={skillDescription} skillId="smuggling" />
 
           <TouchableOpacity
             accessibilityRole="button"

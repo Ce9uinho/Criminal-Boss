@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useGameStore } from '@/store/gameStore';
-import { useAchievementTotals } from '@/hooks/useAchievementSnapshot';
+import { ACHIEVEMENTS } from '@/constants/achievements';
 import { formatCash } from '@/constants/numberFormat';
 import { SKILL_ICONS, getXpForLevel, RESOURCES } from '@/constants/gameData';
 import { User, Crown, Trophy, Clock, Coins, TrendingUp, Star, Award, Target, Calendar, Skull, Cigarette, Bomb, Car, DollarSign, Save, Briefcase, Bike, Syringe } from 'lucide-react-native';
@@ -10,7 +10,8 @@ import { User, Crown, Trophy, Clock, Coins, TrendingUp, Star, Award, Target, Cal
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { skills, bank, mastery, gold, playerName, playerIcon, setPlayerName, setPlayerIcon, lifetimeStats } = useGameStore();
-  const achievementTotals = useAchievementTotals();
+  const unlockedCount = useGameStore(s => Object.keys(s.achievementsUnlocked).length);
+  const achievementTotals = { completed: unlockedCount, total: ACHIEVEMENTS.length };
   const totalProduced = Object.values(lifetimeStats?.produced ?? {}).reduce((sum, n) => sum + n, 0);
   const [editOpen, setEditOpen] = useState<boolean>(false);
   const [draftName, setDraftName] = useState<string>(playerName ?? '');

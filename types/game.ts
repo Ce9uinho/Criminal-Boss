@@ -154,50 +154,6 @@ export interface SmugglingTool {
   requirements: { resourceId: string; quantity: number }[];
 }
 
-export type AchievementTier = 0 | 1 | 2 | 3 | 4 | 5;
-
-export type AchievementCategory = 'general' | 'drug_factory' | 'distillery' | 'smuggling' | 'investigation_lab' | 'thieving';
-
-export interface AchievementDefinition {
-  id: string;
-  title: string;
-  description: string;
-  icon: string;
-  category: AchievementCategory;
-  tiers: number[];
-  evaluate: (state: GameStateSnapshot) => number;
-}
-
-export interface AchievementProgress {
-  level: AchievementTier;
-  completedAt: number[];
-}
-
-export interface SkillMetaSnapshot {
-  toolsUnlocked: number;
-  toolsTotal: number;
-  masteryPctAt25: number;
-  masteryPctAt50: number;
-  masteryPctAt75: number;
-  masteryPctAt100: number;
-  craftedTotal: number;
-  rareCollected: number;
-}
-
-export interface GameStateSnapshot {
-  gold: number;
-  totalItemsInBank: number;
-  uniqueItemsInBank: number;
-  averageSkillLevel: number;
-  highestSkillLevel: number;
-  masteryMilestones25: number;
-  masteryMilestones50: number;
-  masteryMilestones75: number;
-  masteryMilestones100: number;
-  skillLevels?: Record<string, number>;
-  perSkill?: Record<string, SkillMetaSnapshot>;
-}
-
 export type EquipmentSlot = 'weapon' | 'offhand' | 'helmet' | 'chest' | 'legs' | 'boots' | 'gloves' | 'amulet' | 'ring' | 'ammunition' | 'backpack' | 'scroll' | 'potion';
 
 export interface CombatStats {
