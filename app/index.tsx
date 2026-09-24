@@ -14,12 +14,18 @@ import { SkillHeader } from '@/components/SkillHeader';
 import { SkillList } from '@/components/SkillList';
 import { GameNotices } from '@/components/GameNotices';
 import { WelcomeBackModal } from '@/components/WelcomeBackModal';
+import { HQ } from '@/components/HQ';
+import { DailyRewardModal } from '@/components/DailyRewardModal';
+import { nextStreakDay, getRankInfo } from '@/constants/progression';
 import { theme } from '@/constants/theme';
 
-type ViewType = 'skills' | 'bank' | 'shop' | 'combat';
+type ViewType = 'hq' | 'skills' | 'bank' | 'shop' | 'combat';
 
 export default function GameScreen() {
-  const [currentView, setCurrentView] = useState<ViewType>('skills');
+  const [currentView, setCurrentView] = useState<ViewType>('hq');
+  const [showDaily, setShowDaily] = useState(false);
+  const isLoading = useGameStore(s => s.isLoading);
+  const offlineSummary = useGameStore(s => s.offlineSummary);
   const [selectedSkill, setSelectedSkill] = useState<string | null>('smuggling');
   const [showSidebar, setShowSidebar] = useState(false);
   const [showGameMenu, setShowGameMenu] = useState(false);
@@ -33,6 +39,30 @@ export default function GameScreen() {
   useEffect(() => {
     loadGame();
   }, [loadGame]);
+
+  // Celebrate promotions: the rank is the headline number of the whole game.
+  const rankIndex = useGameStore(s => getRankInfo(s.getReputation()).index);
+  const lastRank = React.useRef<number | null>(null);
+  useEffect(() => {
+    if (isLoading) return;
+    if (lastRank.current !== null && rankIndex > lastRank.current) {
+      const { rank } = getRankInfo(useGameStore.getState().getReputation());
+      useGameStore.getState().pushNotice({ kind: 'agent', title: `Promoted: ${rank.title}!`, message: rank.perk, icon: rank.icon });
+    }
+    lastRank.current = rankIndex;
+  }, [rankIndex, isLoading]);
+
+  // Offer the daily payoff once per session, right after the "welcome back" report.
+  const dailyOffered = React.useRef(false);
+  useEffect(() => {
+    if (isLoading || offlineSummary || dailyOffered.current) return;
+    const { lastDailyClaim, dailyStreak } = useGameStore.getState();
+    dailyOffered.current = true;
+    if (nextStreakDay(lastDailyClaim, dailyStreak).claimable) {
+      const t = setTimeout(() => setShowDaily(true), 600);
+      return () => clearTimeout(t);
+    }
+  }, [isLoading, offlineSummary]);
 
   // Persist progress whenever the app is backgrounded or the tab is closed, so
   // nothing earned since the last 30s autosave is lost.
@@ -97,8 +127,22 @@ export default function GameScreen() {
     setShowSidebar(false);
   };
 
+  const openSkill = (skillId: string) => {
+    setSelectedSkill(skillId);
+    setCurrentView('skills');
+    setShowSidebar(false);
+  };
+
   const renderContent = () => {
     switch (currentView) {
+      case 'hq':
+        return (
+          <HQ
+            onOpenSkill={openSkill}
+            onOpenView={view => handleSetCurrentView(view)}
+            onOpenDaily={() => setShowDaily(true)}
+          />
+        );
       case 'skills':
         return (
           <SkillGrid 
@@ -158,7 +202,7 @@ export default function GameScreen() {
               {renderContent()}
             </View>
           ) : (
-            <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollInner} showsVerticalScrollIndicator={false} testID="scroll-content">
+            <ScrollView key={`${currentView}_${selectedSkill}`} style={styles.scrollContent} contentContainerStyle={styles.scrollInner} showsVerticalScrollIndicator={false} testID="scroll-content">
               {renderContent()}
             </ScrollView>
           )}
@@ -184,6 +228,7 @@ export default function GameScreen() {
       {showGameMenu && <GameMenu onClose={() => setShowGameMenu(false)} />}
       <GameNotices top={insets.top + 60} />
       <WelcomeBackModal />
+      <DailyRewardModal visible={showDaily} onClose={() => setShowDaily(false)} />
     </View>
   );
 }

@@ -1,4 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { LockedTeaser } from '@/components/LockedTeaser';
+import { SkillBlurb } from '@/components/SkillBlurb';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Modal, ScrollView, TextInput } from 'react-native';
 import { Skill, Activity } from '@/types/game';
 import { ACTIVITIES, getXpForLevel, RESOURCES, hasRequiredInputs, getMissingInputs, SMUGGLING_ZONES, STORE_ITEMS, MAX_LEVEL, SKILL_DESCRIPTIONS, AGENTS, getSmugglingXp } from '@/constants/gameData';
@@ -181,7 +183,10 @@ export default function SkillCard({ skill, onNavigateToStore, onNavigateToSmuggl
   }, [skill.isActive, skill.currentActivity, skill.level, mastery, equippedDrugToolId, equippedDistilleryToolId, equippedInvestigationLabToolId]);
 
   // Show all activities, not just available ones - they'll be shown as locked if level is too low
-  const availableActivities = activities;
+  // Unlocked jobs plus the very next one as a teaser; the rest collapse into a summary row.
+  const firstLockedIdx = activities.findIndex(a => a.levelRequired > skill.level);
+  const availableActivities = firstLockedIdx === -1 ? activities : activities.slice(0, firstLockedIdx + 1);
+  const hiddenLocked = firstLockedIdx === -1 ? [] : activities.slice(firstLockedIdx + 1);
 
   // Calculate thieving stats for all activities at the top level to ensure reactivity
   const thievingAgentUnlocked = useGameStore(state => state.skills.thieving.agentUnlocked ?? false);
@@ -306,11 +311,7 @@ export default function SkillCard({ skill, onNavigateToStore, onNavigateToSmuggl
       },
     ]}>
       {/* Skill Description - Above the cards */}
-      {skillDescription && (
-        <View style={styles.skillDescriptionContainer}>
-          <Text style={styles.skillDescriptionText}>{skillDescription}</Text>
-        </View>
-      )}
+      <SkillBlurb text={skillDescription} />
 
       {/* Tools Banners */}
       {skill.id === 'thieving' && (
@@ -857,6 +858,7 @@ export default function SkillCard({ skill, onNavigateToStore, onNavigateToSmuggl
           </Animated.View>
           );
         })}
+        <LockedTeaser count={hiddenLocked.length} noun={skill.id === 'thieving' ? 'targets' : 'recipes'} levels={hiddenLocked.map(a => a.levelRequired)} />
       </View>
       
 

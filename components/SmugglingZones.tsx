@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { LockedTeaser } from '@/components/LockedTeaser';
+import { SkillBlurb } from '@/components/SkillBlurb';
 import {
   View,
   Text,
@@ -70,6 +72,11 @@ export function SmugglingZones() {
 
   const formatTime = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
 
+  // Unlocked routes plus the next one; later routes collapse into a summary row.
+  const firstLockedZone = SMUGGLING_ZONES.findIndex(z => z.levelRequired > skill.level);
+  const visibleZones = firstLockedZone === -1 ? SMUGGLING_ZONES : SMUGGLING_ZONES.slice(0, firstLockedZone + 1);
+  const hiddenZones = firstLockedZone === -1 ? [] : SMUGGLING_ZONES.slice(firstLockedZone + 1);
+
   const getActualXp = (zone: SmugglingZone) => {
     const masteryId = `smuggling_${zone.id}`;
     const baseActual = getActualTime('smuggling', zone.baseTime, masteryId);
@@ -114,11 +121,7 @@ export function SmugglingZones() {
     <>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false} testID="smuggling-zones">
         <View style={[styles.cardContainer, skill.level >= 100 ? styles.containerWithManager : null]}>
-          {skillDescription && (
-            <View style={styles.skillDescriptionContainer}>
-              <Text style={styles.skillDescriptionText}>{skillDescription}</Text>
-            </View>
-          )}
+          <SkillBlurb text={skillDescription} />
 
           <TouchableOpacity
             accessibilityRole="button"
@@ -162,7 +165,7 @@ export function SmugglingZones() {
             </View>
           )}
 
-          {SMUGGLING_ZONES.map((zone) => {
+          {visibleZones.map((zone) => {
             const isActive = skill.isActive && currentZone?.id === zone.id;
             const isLocked = skill.level < zone.levelRequired;
             const masteryId = `smuggling_${zone.id}`;
@@ -257,6 +260,7 @@ export function SmugglingZones() {
               </TouchableOpacity>
             );
           })}
+          <LockedTeaser count={hiddenZones.length} noun="routes" levels={hiddenZones.map(z => z.levelRequired)} />
         </View>
       </ScrollView>
 

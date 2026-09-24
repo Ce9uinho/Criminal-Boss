@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { GameState, Skill, Activity, BankItem, Mastery, SmugglingZone, BankTab, EquipmentSlot } from '@/types/game';
 import { getLevelFromXp, RESOURCES, hasRequiredInputs, SKILL_DESCRIPTIONS, getSmugglingXp, getXpForLevel, STORE_ITEMS, EQUIPMENT_CATALOG, ACTIVITIES, SMUGGLING_ZONES } from '@/constants/gameData';
+import { Contract, ContractEvent, CONTRACT_SLOTS, DAILY_REWARDS, DailyReward, applyContractEvent, dayKey, generateContract, getRankInfo, getReputation, nextStreakDay } from '@/constants/progression';
 import { COMBAT_DUNGEONS, getDungeonGoldReward, getPlayerCombatStats, getPlayerAttackIntervalMs } from '@/constants/combat';
 import { THIEVING_TOOLS } from '@/constants/thievingTools';
 import { DRUG_TOOLS } from '@/constants/drugTools';
@@ -183,6 +184,20 @@ interface GameStore extends GameState {
   offlineSummary?: OfflineSummary;
   clearOfflineSummary: () => void;
   getAdjustedActionTime: (skillId: string, baseTime: number, activityId: string) => number;
+
+  // Meta progression: respect, contracts board and daily streak
+  respect: number;
+  contracts: Contract[];
+  contractsCompleted: number;
+  dailyStreak: number;
+  lastDailyClaim?: string;
+  trackContract: (event: ContractEvent) => void;
+  refillContracts: () => void;
+  claimContract: (id: string) => void;
+  rerollContract: (id: string) => void;
+  getContractRerollCost: () => number;
+  claimDailyReward: () => DailyReward | null;
+  getReputation: () => number;
 
   // Lifetime counters that feed achievements
   lifetimeStats: LifetimeStats;
@@ -450,6 +465,11 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
   notices: [],
   offlineSummary: undefined,
   lifetimeStats: { produced: {}, rareCollected: 0 },
+  respect: 0,
+  contracts: [],
+  contractsCompleted: 0,
+  dailyStreak: 0,
+  lastDailyClaim: undefined,
   bankItems: INITIAL_BANK_ITEMS,
   equipped: STARTER_EQUIPMENT,
   combatIsActive: false,
@@ -632,6 +652,11 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
             produced: (gameData as any).lifetimeStats?.produced ?? {},
             rareCollected: (gameData as any).lifetimeStats?.rareCollected ?? 0,
           },
+          respect: (gameData as any).respect ?? 0,
+          contracts: Array.isArray((gameData as any).contracts) ? (gameData as any).contracts : [],
+          contractsCompleted: (gameData as any).contractsCompleted ?? 0,
+          dailyStreak: (gameData as any).dailyStreak ?? 0,
+          lastDailyClaim: (gameData as any).lastDailyClaim,
         });
         
         // Process offline progress, then pick the activity back up
@@ -678,6 +703,8 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
         isLoading: false 
       });
     }
+    // Every boss needs something to do: make sure the contract board is full.
+    get().refillContracts();
   },
 
   saveGame: async () => {
@@ -718,6 +745,11 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
         combatLastTab,
         combatSelectedDungeon,
         lifetimeStats: get().lifetimeStats,
+        respect: get().respect,
+        contracts: get().contracts,
+        contractsCompleted: get().contractsCompleted,
+        dailyStreak: get().dailyStreak,
+        lastDailyClaim: get().lastDailyClaim,
       } as typeof gameData & { lifetimeStats: LifetimeStats };
       await AsyncStorage.setItem(SAVE_KEY, JSON.stringify(gameData));
       setTimeout(() => {
@@ -966,6 +998,7 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
         const toolB3 = get().getThievingToolBonuses();
         
         get().recordProduced('thieving', 1);
+        get().trackContract({ type: 'theft', qty: 1 });
         // 1) Guaranteed cash payout
         const cashEntry = activity.lootTable.find(l => l.resourceId === 'cash' || l.resourceId === 'loose_change');
         if (cashEntry) {
@@ -1042,6 +1075,7 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
           const quantityToAdd = Math.max(1, outMult + managerBonus);
           addResource(activity.resource.id, quantityToAdd);
           get().recordProduced(skillId, quantityToAdd);
+          get().trackContract({ type: 'produce', skillId, resourceId: activity.resource.id, qty: quantityToAdd });
         }
       }
       
@@ -1212,8 +1246,10 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
         addResource(selectedItem.resource.id, 1);
         if (selectedItem.minLevel) {
           set(state => ({ lifetimeStats: { ...state.lifetimeStats, rareCollected: state.lifetimeStats.rareCollected + 1 } }));
+          get().pushNotice({ kind: 'success', title: 'Rare find!', message: `Your crew smuggled in ${selectedItem.resource.name}.`, icon: selectedItem.resource.icon });
         }
       }
+      get().trackContract({ type: 'run', qty: 1 });
       
       // Award XP scaled to match target time-to-levels irrespective of loot composition
       const targetPerActionXp = getSmugglingXp(playerLevel, adjustedTime);
@@ -1394,6 +1430,7 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
       const goodRolls = rolls * (1 - junkChance / 100);
       pool.forEach(it => gain(it.id, roundChance(goodRolls * it.weight / Math.max(1, totalWeight))));
       for (let i = 0; i < actions; i++) awardXp(Math.max(1, Math.floor(getSmugglingXp(level, actionTime))));
+      get().trackContract({ type: 'run', qty: actions });
     } else if (resume.skillId === 'thieving') {
       const activity = resolveActivity('thieving', resume.activityId);
       if (!activity) return;
@@ -1411,6 +1448,7 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
       actions = Math.floor(cappedMs / cycleMs);
       const successes = Math.round(actions * (1 - catchRate));
       get().recordProduced('thieving', successes);
+      get().trackContract({ type: 'theft', qty: successes });
       const cash = activity.lootTable?.find(l => l.resourceId === 'cash' || l.resourceId === 'loose_change');
       const avgCash = cash ? (cash.minQuantity + cash.maxQuantity) / 2 : 10;
       goldGained = Math.floor(successes * avgCash * (toolB.lootBonusMultiplier || 1) * (agent ? 1.5 : 1));
@@ -1449,6 +1487,7 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
       const perSuccess = Math.max(1, Math.floor(craftB.outputMultiplier ?? 1)) + (agent ? 1 : 0);
       gain(activity.resource.id, successes * perSuccess);
       get().recordProduced(resume.skillId, successes * perSuccess);
+      get().trackContract({ type: 'produce', skillId: resume.skillId, resourceId: activity.resource.id, qty: successes * perSuccess });
       const baseXp = () => (activity.getDynamicXp ? activity.getDynamicXp(level) : activity.baseXp);
       for (let i = 0; i < actions; i++) awardXp(i < successes ? baseXp() : Math.floor(baseXp() * 0.1));
     }
@@ -1691,7 +1730,8 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
       return;
     }
     
-    const goldEarned = (resource.value || 1) * quantity; // Default to 1 gp if no value
+    const goldEarned = (resource.value || 1) * quantity; // Default to $1 if no value
+    get().trackContract({ type: 'sell', amount: goldEarned });
     console.log('Gold earned:', goldEarned);
     
     set(state => {
@@ -1893,6 +1933,7 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
                 const goldReward = getDungeonGoldReward(dungeon);
                 get().addGold(goldReward);
                 get().addResource('loot_bag', 1);
+                get().trackContract({ type: 'dungeon', qty: 1 });
                 const items = get().combatSessionItems;
                 set({
                   combatSessionGold: get().combatSessionGold + goldReward,
@@ -2622,6 +2663,98 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
 
   clearOfflineSummary: () => set({ offlineSummary: undefined }),
 
+  getReputation: () => {
+    const totalLevel = Object.values(get().skills).reduce((sum, sk) => sum + (sk.level ?? 1), 0);
+    return getReputation(totalLevel, get().respect);
+  },
+
+  refillContracts: () => {
+    const state = get();
+    const levels = Object.fromEntries(Object.entries(state.skills).map(([id, sk]) => [id, sk.level ?? 1]));
+    const contracts = [...state.contracts];
+    while (contracts.length < CONTRACT_SLOTS) {
+      // Keep the board varied: no duplicate jobs, at most two crafting orders.
+      let candidate: Contract | undefined;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const c = generateContract({
+          levels,
+          actionTimeMs: (skillId, baseTime, activityId) => get().getAdjustedActionTime(skillId, baseTime, activityId),
+          exclude: contracts.map(x => x.kind),
+        });
+        const duplicate = contracts.some(x => x.kind === c.kind && x.resourceId === c.resourceId);
+        const tooManyCrafts = c.kind === 'craft' && contracts.filter(x => x.kind === 'craft').length >= 2;
+        candidate = c;
+        if (!duplicate && !tooManyCrafts) break;
+      }
+      contracts.push(candidate!);
+    }
+    if (contracts.length !== state.contracts.length) set({ contracts });
+  },
+
+  trackContract: (event: ContractEvent) => {
+    const before = get().contracts;
+    if (before.length === 0) return;
+    let justDone: Contract | undefined;
+    const next = before.map(c => {
+      const updated = applyContractEvent(c, event);
+      if (updated !== c && updated.progress >= updated.target && c.progress < c.target) justDone = updated;
+      return updated;
+    });
+    if (next.some((c, i) => c !== before[i])) set({ contracts: next });
+    if (justDone) {
+      get().pushNotice({ kind: 'success', title: 'Contract complete!', message: `${justDone.title} — collect your cut at HQ.`, icon: justDone.icon });
+    }
+  },
+
+  claimContract: (id: string) => {
+    const c = get().contracts.find(x => x.id === id);
+    if (!c || c.progress < c.target) return;
+    const { cashBonus } = getRankInfo(get().getReputation());
+    const gold = Math.round(c.reward.gold * (1 + cashBonus));
+    set(state => ({
+      gold: state.gold + gold,
+      respect: state.respect + c.reward.respect,
+      contractsCompleted: state.contractsCompleted + 1,
+      contracts: state.contracts.filter(x => x.id !== id),
+    }));
+    c.reward.items.forEach(it => get().addResource(it.resourceId, it.quantity));
+    get().refillContracts();
+    get().pushNotice({ kind: 'success', title: `+$${gold.toLocaleString()} · +${c.reward.respect} respect`, message: 'A new contract hit the board.', icon: '💰' });
+    setTimeout(() => get().saveGame(), 50);
+  },
+
+  getContractRerollCost: () => {
+    const totalLevel = Object.values(get().skills).reduce((sum, sk) => sum + (sk.level ?? 1), 0);
+    return 50 + totalLevel * 10;
+  },
+
+  rerollContract: (id: string) => {
+    const cost = get().getContractRerollCost();
+    if (get().gold < cost) {
+      get().pushNotice({ kind: 'warning', title: 'Not enough cash', message: `A new contract costs $${cost}.` });
+      return;
+    }
+    set(state => ({ gold: state.gold - cost, contracts: state.contracts.filter(x => x.id !== id) }));
+    get().refillContracts();
+  },
+
+  claimDailyReward: () => {
+    const { lastDailyClaim, dailyStreak } = get();
+    const today = dayKey();
+    const { claimable, day } = nextStreakDay(lastDailyClaim, dailyStreak, today);
+    if (!claimable) return null;
+    const reward = DAILY_REWARDS[day - 1];
+    set(state => ({
+      gold: state.gold + reward.gold,
+      respect: state.respect + reward.respect,
+      dailyStreak: day === 1 ? 1 : state.dailyStreak + 1,
+      lastDailyClaim: today,
+    }));
+    reward.items.forEach(it => get().addResource(it.resourceId, it.quantity));
+    setTimeout(() => get().saveGame(), 50);
+    return reward;
+  },
+
   recordProduced: (skillId: string, amount: number) => {
     if (amount <= 0) return;
     set(state => ({
@@ -2663,6 +2796,7 @@ export const useGameStore = create<GameStore>((rawSet, get) => {
     stopAllTimers();
     await AsyncStorage.removeItem(SAVE_KEY);
     if (initialData) set({ ...initialData, lastSaved: Date.now(), isLoading: false } as Partial<GameStore>);
+    get().refillContracts();
     get().pushNotice({ kind: 'info', title: 'Fresh start', message: 'Your empire has been reset.' });
   },
   };

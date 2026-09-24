@@ -15,8 +15,7 @@ export const THIEVING_TOOLS: ThievingTool[] = [
     },
     requirements: [
       { resourceId: 'cash', quantity: 500 },
-      { resourceId: 'cheap_watch', quantity: 25 },
-      { resourceId: 'premium_wine', quantity: 10 },
+      { resourceId: 'wallet', quantity: 15 },
     ],
   },
   {

@@ -18,8 +18,8 @@ export const DRUG_TOOLS: DrugTool[] = [
     },
     requirements: [
       { resourceId: 'cash', quantity: 500 },
-      { resourceId: 'handmade_cigarettes', quantity: 150 },
-      { resourceId: 'simple_joints', quantity: 120 },
+      { resourceId: 'handmade_cigarettes', quantity: 40 },
+      { resourceId: 'simple_joints', quantity: 20 },
     ],
   },
   {

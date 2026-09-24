@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useGameStore } from '@/store/gameStore';
-import { SKILL_ICONS, getXpForLevel, MAX_LEVEL } from '@/constants/gameData';
+import { getXpForLevel, MAX_LEVEL } from '@/constants/gameData';
+import { SkillIcon } from '@/components/SkillIcon';
 import { theme, skillColor } from '@/constants/theme';
 
 interface SkillListProps {
@@ -43,9 +44,7 @@ export function SkillList({ selectedSkill, onSetSelectedSkill, onClose }: SkillL
               }}
               testID={`skill-list-${skillId}`}
             >
-              <View style={[styles.iconBox, { backgroundColor: `${accent}1F`, borderColor: `${accent}55` }]}>
-                <Text style={styles.icon}>{SKILL_ICONS[skillId]}</Text>
-              </View>
+              <SkillIcon skillId={skillId} size={52} />
               <View style={styles.info}>
                 <View style={styles.row}>
                   <Text style={styles.name} numberOfLines={1}>{skill.name}</Text>

@@ -1,11 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Sword, Store as StoreIcon, Package, LayoutGrid } from 'lucide-react-native';
+import { Sword, Store as StoreIcon, Package, LayoutGrid, Building2 } from 'lucide-react-native';
 import { useGameStore } from '@/store/gameStore';
-import { SKILL_ICONS } from '@/constants/gameData';
+import { SkillIcon } from '@/components/SkillIcon';
 import { theme } from '@/constants/theme';
 
-type ViewType = 'skills' | 'bank' | 'shop' | 'combat';
+type ViewType = 'hq' | 'skills' | 'bank' | 'shop' | 'combat';
 
 interface BottomNavProps {
   currentView: ViewType;
@@ -19,12 +19,15 @@ export function BottomNav({ currentView, selectedSkill, onSetCurrentView, onShow
   const combatActive = useGameStore(s => s.combatIsActive);
   const anySkillActive = useGameStore(s => Object.values(s.skills).some(sk => sk.isActive));
 
-  const items: { id: ViewType; label: string; render: (color: string) => React.ReactNode; live?: boolean }[] = [
+  const claimableContracts = useGameStore(s => s.contracts.filter(c => c.progress >= c.target).length);
+
+  const items: { id: ViewType; label: string; render: (color: string) => React.ReactNode; live?: boolean; badge?: number }[] = [
+    { id: 'hq', label: 'HQ', render: color => <Building2 size={22} color={color} />, badge: claimableContracts },
     {
       id: 'skills',
-      label: 'Empire',
+      label: 'Ops',
       render: color =>
-        selectedSkill ? <Text style={styles.emojiIcon}>{SKILL_ICONS[selectedSkill]}</Text> : <LayoutGrid size={22} color={color} />,
+        selectedSkill ? <SkillIcon skillId={selectedSkill} variant="bare" size={21} color={color} /> : <LayoutGrid size={22} color={color} />,
       live: anySkillActive,
     },
     { id: 'bank', label: 'Stash', render: color => <Package size={22} color={color} /> },
@@ -53,6 +56,11 @@ export function BottomNav({ currentView, selectedSkill, onSetCurrentView, onShow
             <View style={[styles.iconWrap, active && styles.iconWrapActive]}>
               {item.render(color)}
               {item.live && <View style={styles.liveDot} />}
+              {!!item.badge && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{item.badge}</Text>
+                </View>
+              )}
             </View>
             <Text style={[styles.label, active && styles.labelActive]}>{item.label}</Text>
           </TouchableOpacity>
@@ -99,6 +107,25 @@ const styles = StyleSheet.create({
   },
   emojiIcon: {
     fontSize: 20,
+  },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: 2,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: theme.colors.crimson,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: theme.colors.bgElevated,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '900',
   },
   liveDot: {
     position: 'absolute',

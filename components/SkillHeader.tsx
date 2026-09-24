@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, View, Text, StyleSheet } from 'react-native';
 import { useGameStore } from '@/store/gameStore';
-import { SKILL_ICONS, getXpForLevel, MAX_LEVEL } from '@/constants/gameData';
+import { getXpForLevel, MAX_LEVEL } from '@/constants/gameData';
+import { SkillIcon } from '@/components/SkillIcon';
+import { getNextUnlock } from '@/constants/progression';
 import { formatCash } from '@/constants/numberFormat';
 import { theme, skillColor } from '@/constants/theme';
 import { HeaderXpToasts } from './XpToasts';
@@ -50,15 +52,13 @@ export function SkillHeader({ selectedSkill }: SkillHeaderProps) {
   const pct = maxed ? 100 : Math.min(100, Math.max(0, ((exp - currentLevelXp) / Math.max(1, nextLevelXp - currentLevelXp)) * 100));
   const remaining = Math.max(0, nextLevelXp - exp);
   const tone = heatTone(heat);
+  const nextUnlock = getNextUnlock(selectedSkill, lvl);
 
   return (
     <View style={styles.wrap}>
       <View style={[styles.card, { borderColor: `${accent}55` }]}>
-        <View style={[styles.glow, { backgroundColor: accent }]} />
         <View style={styles.topRow}>
-          <View style={[styles.iconBox, { backgroundColor: `${accent}1F`, borderColor: `${accent}66` }]}>
-            <Text style={styles.icon}>{SKILL_ICONS[selectedSkill]}</Text>
-          </View>
+          <SkillIcon skillId={selectedSkill} size={52} />
           <View style={styles.titleCol}>
             <Text style={styles.name} numberOfLines={1}>{skill.name ?? 'Skill'}</Text>
             <View style={styles.statusRow}>
@@ -87,6 +87,14 @@ export function SkillHeader({ selectedSkill }: SkillHeaderProps) {
           <Text style={styles.xpText}>{formatCash(exp)} XP</Text>
           <Text style={styles.xpText}>{maxed ? 'MAX LEVEL' : `${formatCash(remaining)} to Lv ${lvl + 1}`}</Text>
         </View>
+        {nextUnlock && (
+          <View style={[styles.unlockRow, { borderColor: `${accent}33` }]}>
+            <Text style={styles.unlockLabel}>NEXT UNLOCK</Text>
+            <Text style={styles.unlockText} numberOfLines={1}>
+              <Text style={{ color: accent, fontWeight: '900' }}>{nextUnlock.name}</Text> at Lv {nextUnlock.level}
+            </Text>
+          </View>
+        )}
 
         {selectedSkill === 'thieving' && (
           <View style={styles.heatBox} testID="heat-section">
@@ -207,6 +215,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 6,
+  },
+  unlockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+  },
+  unlockLabel: {
+    color: theme.colors.textDim,
+    fontSize: 9.5,
+    fontWeight: '900',
+    letterSpacing: 1.3,
+  },
+  unlockText: {
+    color: theme.colors.textMuted,
+    fontSize: 12.5,
+    fontWeight: '600',
+    flexShrink: 1,
   },
   xpText: {
     color: theme.colors.textDim,

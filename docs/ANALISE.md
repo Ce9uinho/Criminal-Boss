@@ -85,3 +85,32 @@ prestígio, carmim para perigo, esmeralda para XP e lucro. Substitui o azul/verd
 - **Performance**: vários componentes usam `useGameStore()` sem seletor e re-renderizam a cada tick.
   Passar a seletores reduziria trabalho em dispositivos fracos.
 - **Testes**: não há testes; a store (economia, offline, inventário) é a primeira candidata.
+
+---
+
+## 5. Redesign v2 — retenção e "game feel"
+
+**Diagnóstico:** o jogo abria direto numa skill, sem visão do império nem metas de curto prazo, e
+não havia razão para voltar no dia seguinte. Os primeiros upgrades exigiam horas (o lockpick pedia
+25 relógios, ~1500 roubos, e vinho premium do Lab nível 25).
+
+**Loops de retenção implementados**
+
+| Horizonte | Mecânica | Onde |
+|---|---|---|
+| Segundos | Barra de ação, XP a subir, drops raros celebrados | Ops, notificações |
+| Minutos | **Contratos**: 3 trabalhos concretos (3-8 min) com dinheiro + respeito; trocar custa $ | HQ |
+| Horas | **Patentes** Street Rat → Godfather (reputação = níveis × 10 + respeito); cada patente dá bónus nos contratos | Header, HQ |
+| Dias | **Recompensa diária** com streak de 7 dias e jackpot; falhar um dia reinicia | Modal ao abrir, HQ |
+| Sempre | "Próximo desbloqueio" em cada skill; crew parada destacada a vermelho | Cabeçalho de skill, HQ |
+
+**UI**
+- **HQ** é o novo ecrã inicial: cartão do chefe (patente, progresso, património, streak), trabalho atual
+  com barra ao vivo, contratos e grelha das operações.
+- Navegação com 5 separadores (HQ, Ops, Stash, Turf War, Market) e badge de contratos por recolher.
+- Ícones vetoriais próprios por operação em vez de emoji (consistentes em iOS/Android/web).
+- Listas de trabalhos mostram só o que está desbloqueado + o próximo; o resto resume-se numa linha.
+- Descrições longas das skills passam a 2 linhas expansíveis.
+
+**Balanceamento:** primeiros upgrades de cada skill reduzidos para ~10 minutos de jogo
+(ex.: Basic Lockpick = $500 + 15 carteiras).

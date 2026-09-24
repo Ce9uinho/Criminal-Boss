@@ -15,8 +15,7 @@ export const INVESTIGATION_LAB_TOOLS: DrugTool[] = [
     },
     requirements: [
       { resourceId: 'cash', quantity: 500 },
-      { resourceId: 'premium_water', quantity: 50 },
-      { resourceId: 'premium_alcohol', quantity: 30 },
+      { resourceId: 'premium_water', quantity: 20 },
     ],
   },
   {

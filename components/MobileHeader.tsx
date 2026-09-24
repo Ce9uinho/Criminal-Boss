@@ -4,6 +4,7 @@ import { Menu } from 'lucide-react-native';
 import { formatCash } from '@/constants/numberFormat';
 import { useGameStore } from '@/store/gameStore';
 import { theme } from '@/constants/theme';
+import { getRankInfo } from '@/constants/progression';
 
 interface MobileHeaderProps {
   selectedSkill: string | null;
@@ -42,6 +43,8 @@ function CashChip({ gold }: { gold: number }) {
 
 export function MobileHeader({ playerLevel, gold, onShowGameMenu }: MobileHeaderProps) {
   const playerName = useGameStore(s => s.playerName);
+  const reputation = useGameStore(s => s.getReputation());
+  const { rank } = getRankInfo(reputation);
 
   return (
     <View style={styles.header}>
@@ -53,7 +56,9 @@ export function MobileHeader({ playerLevel, gold, onShowGameMenu }: MobileHeader
         <Text style={styles.brandTitle} testID="game-title" numberOfLines={1}>
           CRIMINAL <Text style={styles.brandAccent}>BOSS</Text>
         </Text>
-        <Text style={styles.brandSub} numberOfLines={1}>{playerName}</Text>
+        <Text style={styles.brandSub} numberOfLines={1}>
+          <Text style={styles.rankSub}>{rank.icon} {rank.title}</Text> · {playerName}
+        </Text>
       </View>
 
       <View style={styles.stats}>
@@ -101,6 +106,10 @@ const styles = StyleSheet.create({
   },
   brandAccent: {
     color: theme.colors.gold,
+  },
+  rankSub: {
+    color: theme.colors.gold,
+    fontWeight: '800',
   },
   brandSub: {
     color: theme.colors.textDim,

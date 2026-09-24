@@ -18,8 +18,8 @@ export const DISTILLERY_TOOLS: DrugTool[] = [
     },
     requirements: [
       { resourceId: 'cash', quantity: 500 },
-      { resourceId: 'craft_beer', quantity: 120 },
-      { resourceId: 'simple_wine', quantity: 90 },
+      { resourceId: 'craft_beer', quantity: 30 },
+      { resourceId: 'simple_wine', quantity: 15 },
     ],
   },
   {

@@ -11,6 +11,10 @@ interface GameMenuProps {
 }
 
 const HOW_TO_PLAY: { icon: string; title: string; text: string }[] = [
+  { icon: '🏢', title: 'HQ', text: 'Your command centre: rank, current job, contracts and every operation at a glance.' },
+  { icon: '📋', title: 'Contracts', text: 'Three jobs are always on the board. Finish them for cash and respect; swap one you dislike for a fee.' },
+  { icon: '🐀', title: 'Rank up', text: 'Skill levels and respect raise your reputation, from Street Rat to Godfather. Higher ranks pay more per contract.' },
+  { icon: '🎁', title: 'Daily payoff', text: 'Claim a reward every day. Keep the 7-day streak alive for the jackpot.' },
   { icon: '💼', title: 'Smuggle', text: 'Run crews through smuggling routes to collect goods. Higher levels unlock richer routes.' },
   { icon: '🧪', title: 'Produce', text: 'Drug Factory, Distillery and the Lab turn raw materials into product. Buy materials in the Market.' },
   { icon: '🥷', title: 'Steal', text: 'Thieving pays cash, but builds police Heat. Getting caught puts that job on cooldown.' },
